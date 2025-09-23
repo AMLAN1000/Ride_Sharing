@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "482721895597-aerhb7ck9rhrdbgdbo73elp7llhac3om.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ridesharing",
+            "certificate_hash": "42ae22bd9c9da850c89a9c078a7e19212c1fbc2d"
+          }
+        },
+        {
           "client_id": "482721895597-jf4hfu40m98i8a95o71hdsuob01hlsg7.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
