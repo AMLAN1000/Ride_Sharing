@@ -33,15 +33,17 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
 
     private static final String TAG = "PostRequestActivity";
     private static final String GOOGLE_MAPS_API_KEY = "AIzaSyCD-k7OlWsemXLHwBXyBoQNO8r9rxRc9nM";
+    private static final String OPENWEATHER_API_KEY = "acc6e705fe0c4b7c67e77a98cfc26122"; // Add your key here
+    private static final String OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather";
 
     // UI Components
     private AutocompleteSupportFragment autocompletePickup, autocompleteDrop;
     private TextView tvDepartureTime, tvPassengersCount;
-    private TextView tvDistance, tvDuration, tvTrafficInfo;
+    private TextView tvDistance, tvDuration, tvTrafficInfo, tvWeatherInfo;
     private EditText etFare, etSpecialRequest;
     private Button btnCheckFare, btnPostRequest, btnDecreasePassengers, btnIncreasePassengers;
     private MaterialCardView cardRoutePreview;
-    private LinearLayout layoutTrafficInfo, layoutFareAnalysis;
+    private LinearLayout layoutTrafficInfo, layoutFareAnalysis, layoutWeatherInfo;
     private TextView tvFairRange, tvFairnessMessage, tvDetailedReason, tvSuggestion;
     private RadioGroup radioGroupVehicleType;
     private RadioButton rbCar, rbBike;
@@ -68,6 +70,12 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     private double routeDuration = 0;
     private double trafficDuration = 0;
     private String vehicleType = "car"; // default
+
+    // Weather data
+    private String currentWeather = "Clear";
+    private String weatherDescription = "";
+    private double weatherMultiplier = 1.0;
+    private double temperature = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,7 +104,9 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         tvDistance = findViewById(R.id.tv_distance);
         tvDuration = findViewById(R.id.tv_duration);
         tvTrafficInfo = findViewById(R.id.tv_traffic_info);
+        tvWeatherInfo = findViewById(R.id.tv_weather_info);
         layoutTrafficInfo = findViewById(R.id.layout_traffic_info);
+        layoutWeatherInfo = findViewById(R.id.layout_weather_info);
         tvDepartureTime = findViewById(R.id.tv_departure_time);
         etFare = findViewById(R.id.et_fare);
         btnCheckFare = findViewById(R.id.btn_check_fare);
@@ -119,6 +129,9 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         tvPassengersCount.setText(String.valueOf(passengersCount));
         btnCheckFare.setEnabled(false);
         btnPostRequest.setEnabled(false);
+
+        // Hide weather layout initially
+        layoutWeatherInfo.setVisibility(View.GONE);
     }
 
     private void setupFirebase() {
@@ -309,6 +322,9 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                 JSONObject jsonResponse = new JSONObject(response.toString());
                 parseDirectionsResponse(jsonResponse);
 
+                // Fetch weather after route calculation
+                fetchWeatherData(pickupLatLng);
+
             } catch (Exception e) {
                 Log.e(TAG, "Error fetching directions", e);
                 runOnUiThread(() -> {
@@ -317,6 +333,154 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                 });
             }
         }).start();
+    }
+
+    private void fetchWeatherData(LatLng location) {
+        new Thread(() -> {
+            try {
+                String urlString = OPENWEATHER_BASE_URL + "?" +
+                        "lat=" + location.latitude +
+                        "&lon=" + location.longitude +
+                        "&appid=" + OPENWEATHER_API_KEY +
+                        "&units=metric"; // For Celsius temperature
+
+                URL url = new URL(urlString);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+
+                JSONObject jsonResponse = new JSONObject(response.toString());
+                parseWeatherResponse(jsonResponse);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching weather data", e);
+                runOnUiThread(() -> {
+                    // Default weather if API fails
+                    currentWeather = "Clear";
+                    weatherDescription = "Weather data unavailable";
+                    temperature = 25.0;
+                    weatherMultiplier = 1.0;
+
+                    tvWeatherInfo.setText("Weather: Data unavailable");
+                    layoutWeatherInfo.setVisibility(View.VISIBLE);
+                });
+            }
+        }).start();
+    }
+
+    private void parseWeatherResponse(JSONObject jsonResponse) {
+        try {
+            // Get main weather
+            JSONArray weatherArray = jsonResponse.getJSONArray("weather");
+            if (weatherArray.length() > 0) {
+                JSONObject weatherObj = weatherArray.getJSONObject(0);
+                currentWeather = weatherObj.getString("main");
+                weatherDescription = weatherObj.getString("description");
+            }
+
+            // Get temperature
+            JSONObject mainObj = jsonResponse.getJSONObject("main");
+            temperature = mainObj.getDouble("temp");
+
+            // Calculate weather multiplier based on conditions
+            weatherMultiplier = calculateWeatherMultiplier(currentWeather, temperature);
+
+            runOnUiThread(() -> {
+                updateWeatherUI();
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing weather data", e);
+            runOnUiThread(() -> {
+                currentWeather = "Clear";
+                weatherDescription = "Weather data unavailable";
+                temperature = 25.0;
+                weatherMultiplier = 1.0;
+
+                tvWeatherInfo.setText("Weather: Data unavailable");
+                layoutWeatherInfo.setVisibility(View.VISIBLE);
+            });
+        }
+    }
+
+    private double calculateWeatherMultiplier(String weatherCondition, double temperature) {
+        switch (weatherCondition.toLowerCase()) {
+            case "thunderstorm":
+                return 1.25; // 25% increase for thunderstorms
+            case "rain":
+            case "drizzle":
+                return 1.2; // 20% increase for rain
+            case "snow":
+                return 1.3; // 30% increase for snow
+            case "mist":
+            case "fog":
+            case "haze":
+                return 1.15; // 15% increase for poor visibility
+            case "clouds":
+                return 1.05; // 5% increase for cloudy
+            case "extreme": // Extreme conditions
+                return 1.4; // 40% increase
+            case "clear":
+            default:
+                // Check temperature extremes
+                if (temperature > 35) { // Very hot
+                    return 1.1;
+                } else if (temperature < 10) { // Very cold
+                    return 1.1;
+                }
+                return 1.0; // Normal weather
+        }
+    }
+
+    private void updateWeatherUI() {
+        String weatherEmoji = getWeatherEmoji(currentWeather);
+        String tempString = String.format(Locale.getDefault(), "%.0f°C", temperature);
+
+        String weatherText = String.format(Locale.getDefault(),
+                "%s %s | %s | Temp: %s",
+                weatherEmoji, currentWeather, weatherDescription, tempString);
+
+        tvWeatherInfo.setText(weatherText);
+        layoutWeatherInfo.setVisibility(View.VISIBLE);
+
+        // Show weather impact on fare
+        if (weatherMultiplier > 1.0) {
+            String impactText = String.format(Locale.getDefault(),
+                    "Note: Weather increases fare by %.0f%%",
+                    (weatherMultiplier - 1.0) * 100);
+            Toast.makeText(this, impactText, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String getWeatherEmoji(String weatherCondition) {
+        switch (weatherCondition.toLowerCase()) {
+            case "thunderstorm":
+                return "⛈️";
+            case "rain":
+            case "drizzle":
+                return "🌧️";
+            case "snow":
+                return "❄️";
+            case "mist":
+            case "fog":
+            case "haze":
+                return "🌫️";
+            case "clouds":
+                return "☁️";
+            case "clear":
+                return "☀️";
+            case "extreme":
+                return "⚠️";
+            default:
+                return "🌤️";
+        }
     }
 
     private void parseDirectionsResponse(JSONObject jsonResponse) {
@@ -545,10 +709,18 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                 disablePostButton();
             }
 
-            // Show only distance info instead of price range
-            tvFairRange.setText(String.format(Locale.getDefault(),
-                    "Distance: %.1f km • Traffic: %s",
-                    routeDistance, getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY))));
+            // Show distance, traffic and weather info
+            String infoText = String.format(Locale.getDefault(),
+                    "Distance: %.1f km • Traffic: %s • Weather: %s",
+                    routeDistance, getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)),
+                    currentWeather);
+
+            if (weatherMultiplier > 1.0) {
+                infoText += String.format(Locale.getDefault(),
+                        " (+%.0f%%)", (weatherMultiplier - 1.0) * 100);
+            }
+
+            tvFairRange.setText(infoText);
         });
     }
 
@@ -559,6 +731,7 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         calculatedFairFare = baseFare + (distance * farePerKm);
         calculatedFairFare *= getTimeMultiplier();
         calculatedFairFare *= getTrafficMultiplier();
+        calculatedFairFare *= weatherMultiplier; // Apply weather multiplier
         calculatedFairFare *= getPassengerMultiplier(passengers);
         calculatedFairFare *= getDistanceMultiplier(distance);
 
@@ -575,19 +748,40 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     }
 
     private String getFareFairReason(double userFare) {
-        return String.format(Locale.getDefault(),
-                "Your fare is appropriate for:\n• %.1f km distance\n• %s\n• %s traffic\n• %d passenger%s",
+        String reason = String.format(Locale.getDefault(),
+                "Your fare is appropriate for:\n• %.1f km distance\n• %s\n• %s traffic",
                 routeDistance, getTimeOfDayDescription(),
-                getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)),
+                getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)));
+
+        // Add weather info if it affects fare
+        if (weatherMultiplier > 1.0) {
+            reason += String.format(Locale.getDefault(),
+                    "\n• %s weather (increased fare by %.0f%%)",
+                    currentWeather, (weatherMultiplier - 1.0) * 100);
+        }
+
+        reason += String.format(Locale.getDefault(),
+                "\n• %d passenger%s",
                 passengersCount, passengersCount > 1 ? "s" : "");
+
+        return reason;
     }
 
     private String getFareUnfairReason(double userFare, double distance) {
         if (userFare < minFairFare) {
-            return String.format(Locale.getDefault(),
+            String reason = String.format(Locale.getDefault(),
                     "Your fare is below the fair market rate for:\n• Distance: %.1f km\n• Time: %s\n• Traffic: %s",
                     distance, getTimeOfDayDescription(),
                     getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)));
+
+            // Add weather info if it affects fare
+            if (weatherMultiplier > 1.0) {
+                reason += String.format(Locale.getDefault(),
+                        "\n• %s weather (requires %.0f%% increase)",
+                        currentWeather, (weatherMultiplier - 1.0) * 100);
+            }
+
+            return reason;
         } else {
             return String.format(Locale.getDefault(),
                     "Your fare is above what drivers typically expect for:\n• Distance: %.1f km\n• This might reduce your chance of getting a ride",
@@ -597,7 +791,14 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
 
     private String getFareSuggestion(double userFare) {
         if (userFare < minFairFare) {
-            return "💡 Consider a higher fare to get better driver matches";
+            String suggestion = "💡 Consider a higher fare to get better driver matches";
+
+            // Add specific weather note if applicable
+            if (weatherMultiplier > 1.0) {
+                suggestion += " (especially in " + currentWeather.toLowerCase() + " weather)";
+            }
+
+            return suggestion;
         } else {
             return "💡 Consider a lower fare to attract more drivers";
         }
@@ -730,6 +931,12 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         rideRequest.put("departureTime", calendar.getTimeInMillis());
         rideRequest.put("createdAt", System.currentTimeMillis());
 
+        // Weather info
+        rideRequest.put("weatherCondition", currentWeather);
+        rideRequest.put("weatherDescription", weatherDescription);
+        rideRequest.put("temperature", temperature);
+        rideRequest.put("weatherMultiplier", weatherMultiplier);
+
         // Additional info
         rideRequest.put("specialRequest", etSpecialRequest.getText().toString().trim());
         rideRequest.put("status", "pending");
@@ -787,9 +994,16 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
 
         cardRoutePreview.setVisibility(View.GONE);
         layoutTrafficInfo.setVisibility(View.GONE);
+        layoutWeatherInfo.setVisibility(View.GONE);
         btnPostRequest.setEnabled(false);
         btnPostRequest.setText("Post Request");
         btnCheckFare.setEnabled(false);
+
+        // Reset weather data
+        currentWeather = "Clear";
+        weatherDescription = "";
+        weatherMultiplier = 1.0;
+        temperature = 0;
     }
 
     private double calculateHaversineDistance(LatLng point1, LatLng point2) {

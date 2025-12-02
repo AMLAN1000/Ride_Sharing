@@ -12,7 +12,6 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Header -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -23,7 +22,6 @@
             android:gravity="center"
             android:layout_marginBottom="24dp" />
 
-        <!-- Main Map Fragment -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="200dp"
@@ -40,7 +38,6 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Location Selection Section with Autocomplete -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -64,7 +61,6 @@
                     android:textColor="#212121"
                     android:layout_marginBottom="16dp" />
 
-                <!-- Pickup Autocomplete -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -94,14 +90,12 @@
 
                 </LinearLayout>
 
-                <!-- Divider -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="#E0E0E0"
                     android:layout_marginBottom="16dp" />
 
-                <!-- Drop Autocomplete -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -134,7 +128,6 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Selected Route Preview -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/card_route_preview"
             android:layout_width="match_parent"
@@ -160,7 +153,6 @@
                     android:textColor="#212121"
                     android:layout_marginBottom="12dp" />
 
-                <!-- Distance and Duration -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -217,7 +209,6 @@
 
                 </LinearLayout>
 
-                <!-- Traffic Information -->
                 <LinearLayout
                     android:id="@+id/layout_traffic_info"
                     android:layout_width="match_parent"
@@ -226,6 +217,7 @@
                     android:gravity="center_vertical"
                     android:background="#FFF3E0"
                     android:padding="8dp"
+                    android:layout_marginBottom="8dp"
                     android:visibility="gone">
 
                     <ImageView
@@ -245,11 +237,30 @@
 
                 </LinearLayout>
 
+                <LinearLayout
+                    android:id="@+id/layout_weather_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="8dp"
+                    android:visibility="gone"
+                    android:background="#E0F7FA" android:layout_marginTop="4dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@android:drawable/ic_menu_info_details" android:layout_marginEnd="8dp"
+                        app:tint="#00BCD4" /> <TextView
+                    android:id="@+id/tv_weather_info"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Weather: Loading..."
+                    android:textSize="14sp"
+                    android:textColor="#006064" /> </LinearLayout>
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Time Selection -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -328,7 +339,6 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Fare Input Section -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -352,7 +362,6 @@
                     android:textColor="#212121"
                     android:layout_marginBottom="16dp" />
 
-                <!-- Fare Input -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -426,7 +435,6 @@
                     android:textSize="12sp"
                     android:textColor="@android:color/darker_gray"
                     android:layout_marginTop="4dp" />
-                <!-- Check Fare Button -->
                 <Button
                     android:id="@+id/btn_check_fare"
                     android:layout_width="match_parent"
@@ -440,7 +448,6 @@
                     android:enabled="false"
                     app:cornerRadius="8dp" />
 
-                <!-- Fare Analysis Result -->
                 <LinearLayout
                     android:id="@+id/layout_fare_analysis"
                     android:layout_width="match_parent"
@@ -448,7 +455,6 @@
                     android:orientation="vertical"
                     android:visibility="gone">
 
-                    <!-- Fair Fare Range -->
                     <TextView
                         android:id="@+id/tv_fair_range"
                         android:layout_width="match_parent"
@@ -462,7 +468,6 @@
                         android:background="#E8F5E8"
                         android:layout_marginBottom="8dp" />
 
-                    <!-- Fairness Message -->
                     <TextView
                         android:id="@+id/tv_fairness_message"
                         android:layout_width="match_parent"
@@ -474,7 +479,6 @@
                         android:background="#FFF3E0"
                         android:layout_marginBottom="8dp" />
 
-                    <!-- Detailed Reason -->
                     <TextView
                         android:id="@+id/tv_detailed_reason"
                         android:layout_width="match_parent"
@@ -486,7 +490,6 @@
                         android:background="#F5F5F5"
                         android:visibility="gone" />
 
-                    <!-- Suggestion -->
                     <TextView
                         android:id="@+id/tv_suggestion"
                         android:layout_width="match_parent"
@@ -505,7 +508,6 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Additional Details -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -529,7 +531,6 @@
                     android:textColor="#212121"
                     android:layout_marginBottom="16dp" />
 
-                <!-- Passengers -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -587,7 +588,6 @@
 
                 </LinearLayout>
 
-                <!-- Special Request -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -628,7 +628,6 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Info Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -664,7 +663,6 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Post Button -->
         <Button
             android:id="@+id/btn_post_request"
             android:layout_width="match_parent"
@@ -677,7 +675,6 @@
             android:enabled="false"
             app:cornerRadius="12dp" />
 
-        <!-- Bottom Navigation Space -->
         <View
             android:layout_width="match_parent"
             android:layout_height="80dp" />
