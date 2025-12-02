@@ -545,9 +545,10 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                 disablePostButton();
             }
 
+            // Show only distance info instead of price range
             tvFairRange.setText(String.format(Locale.getDefault(),
-                    "Fair range: ৳%d - ৳%d (Distance: %.1f km)",
-                    (int)minFairFare, (int)maxFairFare, routeDistance));
+                    "Distance: %.1f km • Traffic: %s",
+                    routeDistance, getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY))));
         });
     }
 
@@ -575,8 +576,8 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
 
     private String getFareFairReason(double userFare) {
         return String.format(Locale.getDefault(),
-                "Your fare of ৳%.0f is perfect for:\n• %.1f km distance\n• %s\n• %s traffic\n• %d passenger%s",
-                userFare, routeDistance, getTimeOfDayDescription(),
+                "Your fare is appropriate for:\n• %.1f km distance\n• %s\n• %s traffic\n• %d passenger%s",
+                routeDistance, getTimeOfDayDescription(),
                 getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)),
                 passengersCount, passengersCount > 1 ? "s" : "");
     }
@@ -584,25 +585,21 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     private String getFareUnfairReason(double userFare, double distance) {
         if (userFare < minFairFare) {
             return String.format(Locale.getDefault(),
-                    "Your fare of ৳%.0f is too low:\n• Distance: %.1f km\n• Time: %s\n• Traffic: %s",
-                    userFare, distance, getTimeOfDayDescription(),
+                    "Your fare is below the fair market rate for:\n• Distance: %.1f km\n• Time: %s\n• Traffic: %s",
+                    distance, getTimeOfDayDescription(),
                     getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)));
         } else {
             return String.format(Locale.getDefault(),
-                    "Your fare of ৳%.0f is too high:\n• Distance: %.1f km\n• May not attract drivers",
-                    userFare, distance);
+                    "Your fare is above what drivers typically expect for:\n• Distance: %.1f km\n• This might reduce your chance of getting a ride",
+                    distance);
         }
     }
 
     private String getFareSuggestion(double userFare) {
         if (userFare < minFairFare) {
-            return String.format(Locale.getDefault(),
-                    "💡 Increase to ৳%d - ৳%d for better matches",
-                    (int)minFairFare, (int)maxFairFare);
+            return "💡 Consider a higher fare to get better driver matches";
         } else {
-            return String.format(Locale.getDefault(),
-                    "💡 Decrease to ৳%d - ৳%d to attract drivers",
-                    (int)minFairFare, (int)maxFairFare);
+            return "💡 Consider a lower fare to attract more drivers";
         }
     }
 
