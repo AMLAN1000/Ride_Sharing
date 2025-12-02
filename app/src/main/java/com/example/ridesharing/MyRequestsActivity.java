@@ -122,6 +122,9 @@ public class MyRequestsActivity extends AppCompatActivity {
                                 MyRideRequest request = parseMyRideRequest(document);
                                 if (request != null) {
                                     showAcceptanceDialog(request);
+
+                                    // 🚨 REMOVED RIDE COUNT INCREMENT HERE. It now happens on completion in MyRidesActivity.
+
                                     document.getReference().update("notificationShown", true);
                                 }
                             }
@@ -130,13 +133,17 @@ public class MyRequestsActivity extends AppCompatActivity {
 
                     myRequests.clear();
                     for (QueryDocumentSnapshot document : snapshots) {
-                        try {
-                            MyRideRequest request = parseMyRideRequest(document);
-                            if (request != null) {
-                                myRequests.add(request);
+                        // Filter out accepted/completed rides, as they should appear in MyRidesActivity now
+                        String status = document.getString("status");
+                        if (!"accepted".equals(status) && !"completed".equals(status)) {
+                            try {
+                                MyRideRequest request = parseMyRideRequest(document);
+                                if (request != null) {
+                                    myRequests.add(request);
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error parsing request", e);
                             }
-                        } catch (Exception e) {
-                            Log.e(TAG, "Error parsing request", e);
                         }
                     }
 
@@ -149,6 +156,8 @@ public class MyRequestsActivity extends AppCompatActivity {
                     }
                 });
     }
+
+    // ... (rest of the MyRequestsActivity.java code remains the same, except for the now unused incrementRideCount method which should also be removed if it existed)
 
     private MyRideRequest parseMyRideRequest(QueryDocumentSnapshot document) {
         String id = document.getId();
@@ -198,6 +207,7 @@ public class MyRequestsActivity extends AppCompatActivity {
         playNotificationSound();
     }
 
+    // ... (rest of the code remains the same)
     private void playNotificationSound() {
         try {
             android.media.RingtoneManager.getRingtone(
