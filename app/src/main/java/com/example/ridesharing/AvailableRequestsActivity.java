@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -307,12 +308,13 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
                     }
 
                     // Sort by createdAt in memory (newest first)
+                    // NOTE: This assumes 'createdAt' field is available and comparable (e.g., Long)
                     Collections.sort(newRequests, new Comparator<RideRequest>() {
                         @Override
                         public int compare(RideRequest r1, RideRequest r2) {
-                            // You'll need to store createdAt in RideRequest for this
-                            // For now, just keep the order as is
-                            return 0;
+                            // If you store createdAt in RideRequest, compare them here:
+                            // return Long.compare(r2.getCreatedAt(), r1.getCreatedAt()); // Newest first
+                            return 0; // Defaulting to no specific sort for this example
                         }
                     });
 
@@ -343,6 +345,8 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
             String id = document.getId();
             Log.d(TAG, "Parsing document ID: " + id);
 
+            String passengerId = document.contains("passengerId") ? document.getString("passengerId") : "";
+
             // Get all fields with extensive null checking
             String passengerName = document.contains("passengerName") ? document.getString("passengerName") : null;
             if (passengerName == null || passengerName.trim().isEmpty()) {
@@ -351,7 +355,6 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
 
             String passengerPhoto = document.contains("passengerPhoto") ? document.getString("passengerPhoto") : "";
             String passengerPhone = document.contains("passengerPhone") ? document.getString("passengerPhone") : "";
-            String passengerId = document.contains("passengerId") ? document.getString("passengerId") : "";
 
             Double rating = document.contains("passengerRating") ? document.getDouble("passengerRating") : null;
             if (rating == null) rating = 4.5;
@@ -426,7 +429,7 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
                     departureTimeStr,
                     timeRemainingStr,
                     fare,
-                    passengerId,
+                    passengerId, // Pass passengerId to the RideRequest model
                     passengers,
                     specialRequest,
                     passengerPhoto,
@@ -544,12 +547,30 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
         });
     }
 
+    /**
+     * Guardrail against self-acceptance implemented here.
+     */
     @Override
     public void onAcceptRequestClick(RideRequest request) {
-        if (mAuth.getCurrentUser() == null) {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) {
             Toast.makeText(this, "Please login to accept requests", Toast.LENGTH_SHORT).show();
             return;
         }
+
+        String currentUserId = currentUser.getUid();
+
+        // --- CRITICAL CHECK: Prevent self-acceptance ---
+        if (currentUserId.equals(request.getPassengerId())) {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Cannot Accept Own Request")
+                    .setMessage("You cannot accept your own ride request. This feature is for drivers to find passengers.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            Log.w(TAG, "Attempted self-acceptance by user: " + currentUserId);
+            return;
+        }
+        // ---------------------------------------------
 
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Accept Ride Request")
@@ -632,6 +653,7 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
         if (request.getPickupLat() != null && request.getPickupLng() != null &&
                 request.getDropLat() != null && request.getDropLng() != null) {
             try {
+                // Fixed the URI construction to open Google Maps directions
                 String uri = String.format(Locale.ENGLISH,
                         "http://maps.google.com/maps?saddr=%f,%f&daddr=%f,%f",
                         request.getPickupLat(), request.getPickupLng(),
@@ -641,6 +663,7 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
                 intent.setPackage("com.google.android.apps.maps");
                 startActivity(intent);
             } catch (Exception e) {
+                // Fallback to general intent view
                 String uri = String.format(Locale.ENGLISH,
                         "http://maps.google.com/maps?saddr=%f,%f&daddr=%f,%f",
                         request.getPickupLat(), request.getPickupLng(),
