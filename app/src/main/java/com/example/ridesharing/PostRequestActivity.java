@@ -863,25 +863,55 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                                 // Only schedule if departure time is in the future
                                 if (delay > 0) {
                                     new android.os.Handler().postDelayed(() -> {
+                                        // ✅ FIX: CHECK STATUS BEFORE DELETING
                                         db.collection("ride_requests")
                                                 .document(documentReference.getId())
-                                                .delete()
-                                                .addOnSuccessListener(aVoid -> {
-                                                    Log.d(TAG, "Auto-deleted expired ride request: " + documentReference.getId());
+                                                .get()
+                                                .addOnSuccessListener(documentSnapshot1 -> {
+                                                    if (documentSnapshot1.exists()) {
+                                                        String status = documentSnapshot1.getString("status");
+
+                                                        // Only delete if status is still "pending"
+                                                        if ("pending".equals(status)) {
+                                                            documentReference.delete()
+                                                                    .addOnSuccessListener(aVoid -> {
+                                                                        Log.d(TAG, "Auto-deleted expired pending ride request: " + documentReference.getId());
+                                                                    })
+                                                                    .addOnFailureListener(e -> {
+                                                                        Log.e(TAG, "Failed to auto-delete ride request: " + e.getMessage());
+                                                                    });
+                                                        } else {
+                                                            Log.d(TAG, "Ride request " + documentReference.getId() + " has status '" + status + "', not deleting.");
+                                                        }
+                                                    }
                                                 })
                                                 .addOnFailureListener(e -> {
-                                                    Log.e(TAG, "Failed to auto-delete ride request: " + e.getMessage());
+                                                    Log.e(TAG, "Failed to check status before auto-delete: " + e.getMessage());
                                                 });
                                     }, delay);
                                 } else {
-                                    // If departure time has already passed, delete immediately
-                                    documentReference.delete()
-                                            .addOnSuccessListener(aVoid -> {
-                                                Log.d(TAG, "Deleted past ride request: " + documentReference.getId());
+                                    // If departure time has already passed, check status before deleting
+                                    db.collection("ride_requests")
+                                            .document(documentReference.getId())
+                                            .get()
+                                            .addOnSuccessListener(documentSnapshot1 -> {
+                                                if (documentSnapshot1.exists()) {
+                                                    String status = documentSnapshot1.getString("status");
+
+                                                    // Only delete if status is "pending"
+                                                    if ("pending".equals(status)) {
+                                                        documentReference.delete()
+                                                                .addOnSuccessListener(aVoid -> {
+                                                                    Log.d(TAG, "Deleted past pending ride request: " + documentReference.getId());
+                                                                });
+                                                    } else {
+                                                        Log.d(TAG, "Ride request has status '" + status + "', not deleting.");
+                                                    }
+                                                }
                                             });
                                 }
 
-                                Toast.makeText(this, "✓ Posted successfully!", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(this, "✅ Posted successfully!", Toast.LENGTH_SHORT).show();
                                 clearForm();
 
                                 new android.os.Handler().postDelayed(() -> {
