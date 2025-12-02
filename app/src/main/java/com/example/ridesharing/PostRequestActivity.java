@@ -3,35 +3,48 @@ package com.example.ridesharing;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.content.Intent;
-import android.location.Address;
-import android.location.Geocoder;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
 import android.widget.*;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.gms.maps.*;
 import com.google.android.gms.maps.model.*;
+import com.google.android.libraries.places.api.Places;
+import com.google.android.libraries.places.api.model.Place;
+import com.google.android.libraries.places.widget.AutocompleteSupportFragment;
+import com.google.android.libraries.places.widget.listener.PlaceSelectionListener;
+import com.google.android.material.card.MaterialCardView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-public class PostRequestActivity extends AppCompatActivity implements OnMapReadyCallback, GoogleMap.OnMapClickListener {
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+public class PostRequestActivity extends AppCompatActivity implements OnMapReadyCallback {
+
+    private static final String TAG = "PostRequestActivity";
+    private static final String GOOGLE_MAPS_API_KEY = "AIzaSyCD-k7OlWsemXLHwBXyBoQNO8r9rxRc9nM";
 
     // UI Components
-    private TextView tvPickupLocation, tvDropLocation, tvDepartureTime, tvPassengersCount, tvDistance, tvDuration, tvTrafficInfo;
+    private AutocompleteSupportFragment autocompletePickup, autocompleteDrop;
+    private TextView tvDepartureTime, tvPassengersCount;
+    private TextView tvDistance, tvDuration, tvTrafficInfo;
     private EditText etFare, etSpecialRequest;
     private Button btnCheckFare, btnPostRequest, btnDecreasePassengers, btnIncreasePassengers;
-    private com.google.android.material.card.MaterialCardView cardRoutePreview;
-    private android.widget.LinearLayout layoutTrafficInfo, layoutFareAnalysis;
+    private MaterialCardView cardRoutePreview;
+    private LinearLayout layoutTrafficInfo, layoutFareAnalysis;
     private TextView tvFairRange, tvFairnessMessage, tvDetailedReason, tvSuggestion;
+    private RadioGroup radioGroupVehicleType;
+    private RadioButton rbCar, rbBike;
 
     // Map
     private GoogleMap mMap;
@@ -48,67 +61,62 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     private double minFairFare = 0;
     private double maxFairFare = 0;
     private LatLng pickupLatLng, dropLatLng;
-    private String currentSelectionType = "pickup";
+    private String pickupAddress = "";
+    private String dropAddress = "";
     private int passengersCount = 1;
-
-    // Route data
     private double routeDistance = 0;
     private double routeDuration = 0;
     private double trafficDuration = 0;
+    private String vehicleType = "car"; // default
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_post_request);
 
+        if (!Places.isInitialized()) {
+            Places.initialize(getApplicationContext(), GOOGLE_MAPS_API_KEY);
+        }
+
         initializeViews();
         setupFirebase();
         setupMap();
+        setupAutocomplete();
         setupClickListeners();
 
-        // Setup bottom navigation
-        BottomNavigationHelper.setupBottomNavigation(this, "POST");
+        try {
+            BottomNavigationHelper.setupBottomNavigation(this, "POST");
+        } catch (Exception e) {
+            Log.e(TAG, "Bottom navigation setup failed", e);
+        }
     }
 
     private void initializeViews() {
-        // Location TextViews
-        tvPickupLocation = findViewById(R.id.tv_pickup_location);
-        tvDropLocation = findViewById(R.id.tv_drop_location);
-
-        // Route Preview
         cardRoutePreview = findViewById(R.id.card_route_preview);
         tvDistance = findViewById(R.id.tv_distance);
         tvDuration = findViewById(R.id.tv_duration);
         tvTrafficInfo = findViewById(R.id.tv_traffic_info);
         layoutTrafficInfo = findViewById(R.id.layout_traffic_info);
-
-        // Time
         tvDepartureTime = findViewById(R.id.tv_departure_time);
-
-        // Fare
         etFare = findViewById(R.id.et_fare);
         btnCheckFare = findViewById(R.id.btn_check_fare);
         btnPostRequest = findViewById(R.id.btn_post_request);
-
-        // Fare Analysis
         layoutFareAnalysis = findViewById(R.id.layout_fare_analysis);
         tvFairRange = findViewById(R.id.tv_fair_range);
         tvFairnessMessage = findViewById(R.id.tv_fairness_message);
         tvDetailedReason = findViewById(R.id.tv_detailed_reason);
         tvSuggestion = findViewById(R.id.tv_suggestion);
-
-        // Passengers
         tvPassengersCount = findViewById(R.id.tv_passengers_count);
         btnDecreasePassengers = findViewById(R.id.btn_decrease_passengers);
         btnIncreasePassengers = findViewById(R.id.btn_increase_passengers);
-
-        // Special Request
         etSpecialRequest = findViewById(R.id.et_special_request);
 
-        // Set default values
-        tvPassengersCount.setText(String.valueOf(passengersCount));
+        // Vehicle type selection
+        radioGroupVehicleType = findViewById(R.id.radio_group_vehicle_type);
+        rbCar = findViewById(R.id.rb_car);
+        rbBike = findViewById(R.id.rb_bike);
 
-        // Initially disable buttons
+        tvPassengersCount.setText(String.valueOf(passengersCount));
         btnCheckFare.setEnabled(false);
         btnPostRequest.setEnabled(false);
     }
@@ -126,28 +134,104 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         }
     }
 
+    private void setupAutocomplete() {
+        // Pickup Autocomplete
+        autocompletePickup = (AutocompleteSupportFragment)
+                getSupportFragmentManager().findFragmentById(R.id.autocomplete_pickup);
+
+        if (autocompletePickup != null) {
+            autocompletePickup.setPlaceFields(Arrays.asList(
+                    Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.ADDRESS
+            ));
+            autocompletePickup.setHint("Pickup location");
+            autocompletePickup.setCountries("BD");
+
+            autocompletePickup.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+                @Override
+                public void onPlaceSelected(Place place) {
+                    pickupLatLng = place.getLatLng();
+                    pickupAddress = place.getAddress() != null ? place.getAddress() : place.getName();
+
+                    if (pickupMarker != null) pickupMarker.remove();
+                    pickupMarker = mMap.addMarker(new MarkerOptions()
+                            .position(pickupLatLng)
+                            .title("Pickup")
+                            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)));
+
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(pickupLatLng, 15));
+
+                    if (pickupLatLng != null && dropLatLng != null) {
+                        calculateRouteWithDirectionsAPI();
+                    }
+                    validateFormCompleteness();
+                }
+
+                @Override
+                public void onError(com.google.android.gms.common.api.Status status) {
+                    Log.e(TAG, "Pickup error: " + status);
+                    Toast.makeText(PostRequestActivity.this, "Error selecting location", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        // Drop Autocomplete
+        autocompleteDrop = (AutocompleteSupportFragment)
+                getSupportFragmentManager().findFragmentById(R.id.autocomplete_drop);
+
+        if (autocompleteDrop != null) {
+            autocompleteDrop.setPlaceFields(Arrays.asList(
+                    Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.ADDRESS
+            ));
+            autocompleteDrop.setHint("Drop-off location");
+            autocompleteDrop.setCountries("BD");
+
+            autocompleteDrop.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+                @Override
+                public void onPlaceSelected(Place place) {
+                    dropLatLng = place.getLatLng();
+                    dropAddress = place.getAddress() != null ? place.getAddress() : place.getName();
+
+                    if (dropMarker != null) dropMarker.remove();
+                    dropMarker = mMap.addMarker(new MarkerOptions()
+                            .position(dropLatLng)
+                            .title("Drop-off")
+                            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
+
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(dropLatLng, 15));
+
+                    if (pickupLatLng != null && dropLatLng != null) {
+                        calculateRouteWithDirectionsAPI();
+                    }
+                    validateFormCompleteness();
+                }
+
+                @Override
+                public void onError(com.google.android.gms.common.api.Status status) {
+                    Log.e(TAG, "Drop error: " + status);
+                    Toast.makeText(PostRequestActivity.this, "Error selecting location", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+
     private void setupClickListeners() {
-        // Location selection
-        tvPickupLocation.setOnClickListener(v -> {
-            currentSelectionType = "pickup";
-            showMapSelectionDialog("Select Pickup Location");
-        });
-
-        tvDropLocation.setOnClickListener(v -> {
-            currentSelectionType = "drop";
-            showMapSelectionDialog("Select Drop Location");
-        });
-
-        // Time selection
         tvDepartureTime.setOnClickListener(v -> showDateTimePicker());
-
-        // Fare checking
         btnCheckFare.setOnClickListener(v -> checkFareFairness());
-
-        // Post request
         btnPostRequest.setOnClickListener(v -> postRideRequest());
 
-        // Passenger counter
+        radioGroupVehicleType.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.rb_car) {
+                vehicleType = "car";
+                btnIncreasePassengers.setEnabled(true);
+            } else if (checkedId == R.id.rb_bike) {
+                vehicleType = "bike";
+                passengersCount = 1;
+                tvPassengersCount.setText("1");
+                btnIncreasePassengers.setEnabled(false);
+            }
+            validateFormCompleteness();
+        });
+
         btnDecreasePassengers.setOnClickListener(v -> {
             if (passengersCount > 1) {
                 passengersCount--;
@@ -157,214 +241,180 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         });
 
         btnIncreasePassengers.setOnClickListener(v -> {
-            if (passengersCount < 4) {
+            if (vehicleType.equals("car") && passengersCount < 4) {
                 passengersCount++;
                 tvPassengersCount.setText(String.valueOf(passengersCount));
                 validateFormCompleteness();
             }
         });
 
-        // Real-time form validation
-        android.text.TextWatcher formValidator = new android.text.TextWatcher() {
+        etFare.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             public void onTextChanged(CharSequence s, int start, int before, int count) {}
             public void afterTextChanged(android.text.Editable s) {
                 validateFormCompleteness();
             }
-        };
-
-        etFare.addTextChangedListener(formValidator);
+        });
     }
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-        setupMapSettings();
+        mMap.getUiSettings().setZoomControlsEnabled(true);
+        mMap.getUiSettings().setCompassEnabled(true);
 
-        // Set default location (Dhaka)
+        try {
+            mMap.setMyLocationEnabled(true);
+            mMap.getUiSettings().setMyLocationButtonEnabled(true);
+        } catch (SecurityException e) {
+            Log.e(TAG, "Location permission not granted", e);
+        }
+
         LatLng dhaka = new LatLng(23.8103, 90.4125);
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(dhaka, 12));
     }
 
-    private void setupMapSettings() {
-        if (mMap != null) {
-            mMap.getUiSettings().setZoomControlsEnabled(true);
-            mMap.getUiSettings().setCompassEnabled(true);
-            mMap.getUiSettings().setMyLocationButtonEnabled(true);
-        }
-    }
+    private void calculateRouteWithDirectionsAPI() {
+        if (pickupLatLng == null || dropLatLng == null) return;
 
-    private void showMapSelectionDialog(String title) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(title);
+        cardRoutePreview.setVisibility(View.VISIBLE);
+        tvDistance.setText("Calculating...");
+        tvDuration.setText("...");
 
-        // Inflate custom layout
-        android.view.View dialogView = getLayoutInflater().inflate(R.layout.dialog_map_selection, null);
-        builder.setView(dialogView);
-
-        FrameLayout mapContainer = dialogView.findViewById(R.id.map_container);
-
-        AlertDialog dialog = builder.create();
-
-        // Setup map in dialog
-        SupportMapFragment mapFragment = SupportMapFragment.newInstance();
-        getSupportFragmentManager().beginTransaction()
-                .add(mapContainer.getId(), mapFragment)
-                .commit();
-
-        mapFragment.getMapAsync(googleMap -> {
-            GoogleMap dialogMap = googleMap;
-            setupDialogMapSettings(dialogMap);
-            dialogMap.setOnMapClickListener(latLng -> {
-                // Handle map click in dialog
-                onMapClick(latLng);
-                dialog.dismiss(); // Close dialog after selection
-            });
-
-            // Move to default location
-            LatLng dhaka = new LatLng(23.8103, 90.4125);
-            dialogMap.moveCamera(CameraUpdateFactory.newLatLngZoom(dhaka, 12));
-        });
-
-        builder.setPositiveButton("Confirm Selection", (dialogInterface, which) -> {
-            // Location is already handled by onMapClick
-        });
-
-        builder.setNegativeButton("Cancel", (dialogInterface, which) -> {
-            // Dialog will be dismissed automatically
-        });
-
-        dialog.show();
-    }
-
-    private void setupDialogMapSettings(GoogleMap map) {
-        map.getUiSettings().setZoomControlsEnabled(true);
-        map.getUiSettings().setCompassEnabled(true);
-        map.getUiSettings().setMyLocationButtonEnabled(true);
-    }
-
-    @Override
-    public void onMapClick(LatLng latLng) {
-        // Add marker at clicked location
-        if (currentSelectionType.equals("pickup")) {
-            if (pickupMarker != null) pickupMarker.remove();
-            pickupMarker = mMap.addMarker(new MarkerOptions()
-                    .position(latLng)
-                    .title("Pickup Location")
-                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)));
-            pickupLatLng = latLng;
-            updateLocationText(latLng, "pickup");
-        } else {
-            if (dropMarker != null) dropMarker.remove();
-            dropMarker = mMap.addMarker(new MarkerOptions()
-                    .position(latLng)
-                    .title("Drop Location")
-                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
-            dropLatLng = latLng;
-            updateLocationText(latLng, "drop");
-        }
-
-        // If both locations are selected, calculate route
-        if (pickupLatLng != null && dropLatLng != null) {
-            calculateRouteAndTraffic();
-        }
-
-        validateFormCompleteness();
-    }
-
-    private void updateLocationText(LatLng latLng, String type) {
         new Thread(() -> {
             try {
-                Geocoder geocoder = new Geocoder(this, Locale.getDefault());
-                List<Address> addresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
+                String origin = pickupLatLng.latitude + "," + pickupLatLng.longitude;
+                String destination = dropLatLng.latitude + "," + dropLatLng.longitude;
 
+                String urlString = "https://maps.googleapis.com/maps/api/directions/json?" +
+                        "origin=" + origin +
+                        "&destination=" + destination +
+                        "&mode=driving" +
+                        "&departure_time=now" +
+                        "&traffic_model=best_guess" +
+                        "&key=" + GOOGLE_MAPS_API_KEY;
+
+                URL url = new URL(urlString);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+
+                JSONObject jsonResponse = new JSONObject(response.toString());
+                parseDirectionsResponse(jsonResponse);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching directions", e);
                 runOnUiThread(() -> {
-                    if (addresses != null && !addresses.isEmpty()) {
-                        String address = addresses.get(0).getAddressLine(0);
-                        if (type.equals("pickup")) {
-                            tvPickupLocation.setText(address);
-                        } else {
-                            tvDropLocation.setText(address);
-                        }
-                    } else {
-                        // Fallback to coordinates
-                        String shortAddress = String.format(Locale.getDefault(), "Lat: %.4f, Lng: %.4f",
-                                latLng.latitude, latLng.longitude);
-                        if (type.equals("pickup")) {
-                            tvPickupLocation.setText(shortAddress);
-                        } else {
-                            tvDropLocation.setText(shortAddress);
-                        }
-                    }
-                });
-            } catch (IOException e) {
-                runOnUiThread(() -> {
-                    String shortAddress = String.format(Locale.getDefault(), "Lat: %.4f, Lng: %.4f",
-                            latLng.latitude, latLng.longitude);
-                    if (type.equals("pickup")) {
-                        tvPickupLocation.setText(shortAddress);
-                    } else {
-                        tvDropLocation.setText(shortAddress);
-                    }
+                    routeDistance = calculateHaversineDistance(pickupLatLng, dropLatLng);
+                    simulateTrafficAndRouteCalculation();
                 });
             }
         }).start();
     }
 
-    private void calculateRouteAndTraffic() {
-        if (pickupLatLng == null || dropLatLng == null) return;
+    private void parseDirectionsResponse(JSONObject jsonResponse) {
+        try {
+            JSONArray routes = jsonResponse.getJSONArray("routes");
+            if (routes.length() > 0) {
+                JSONObject route = routes.getJSONObject(0);
+                JSONArray legs = route.getJSONArray("legs");
 
-        // Show route preview
-        cardRoutePreview.setVisibility(android.view.View.VISIBLE);
+                if (legs.length() > 0) {
+                    JSONObject leg = legs.getJSONObject(0);
 
-        // Calculate direct distance using Haversine
-        routeDistance = calculateHaversineDistance(pickupLatLng, dropLatLng);
+                    JSONObject distance = leg.getJSONObject("distance");
+                    routeDistance = distance.getDouble("value") / 1000.0;
 
-        // Simulate traffic data
-        simulateTrafficAndRouteCalculation();
+                    JSONObject duration = leg.getJSONObject("duration");
+                    routeDuration = duration.getDouble("value") / 60.0;
+
+                    if (leg.has("duration_in_traffic")) {
+                        JSONObject durationInTraffic = leg.getJSONObject("duration_in_traffic");
+                        trafficDuration = durationInTraffic.getDouble("value") / 60.0;
+                    } else {
+                        trafficDuration = routeDuration * getTrafficMultiplier();
+                    }
+
+                    JSONObject polyline = route.getJSONObject("overview_polyline");
+                    String encodedPolyline = polyline.getString("points");
+
+                    runOnUiThread(() -> {
+                        updateRouteUI();
+                        drawEncodedPolyline(encodedPolyline);
+                    });
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing directions", e);
+            runOnUiThread(() -> {
+                routeDistance = calculateHaversineDistance(pickupLatLng, dropLatLng);
+                simulateTrafficAndRouteCalculation();
+            });
+        }
     }
 
     private void simulateTrafficAndRouteCalculation() {
-        int hour = calendar.get(Calendar.HOUR_OF_DAY);
-
-        // Base duration calculation (1 km ≈ 2 minutes in normal traffic)
         routeDuration = routeDistance * 2;
-
-        // Apply traffic multiplier
-        double trafficMultiplier = getTrafficMultiplier();
-        trafficDuration = routeDuration * trafficMultiplier;
-
-        // Update UI
-        runOnUiThread(() -> {
-            tvDistance.setText(String.format(Locale.getDefault(), "%.1f km", routeDistance));
-            tvDuration.setText(String.format(Locale.getDefault(), "%.0f min", trafficDuration));
-
-            // Show traffic information
-            layoutTrafficInfo.setVisibility(android.view.View.VISIBLE);
-            String trafficLevel = getTrafficLevel(hour);
-            tvTrafficInfo.setText("Traffic: " + trafficLevel);
-
-            // Draw route on map
-            drawRouteOnMap();
-        });
+        trafficDuration = routeDuration * getTrafficMultiplier();
+        updateRouteUI();
+        drawStraightLine();
     }
 
-    private void drawRouteOnMap() {
-        if (mMap == null || pickupLatLng == null || dropLatLng == null) return;
+    private void updateRouteUI() {
+        tvDistance.setText(String.format(Locale.getDefault(), "%.1f km", routeDistance));
+        tvDuration.setText(String.format(Locale.getDefault(), "%.0f min", trafficDuration));
 
-        // Clear previous polyline
+        layoutTrafficInfo.setVisibility(View.VISIBLE);
+        String trafficLevel = getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY));
+        tvTrafficInfo.setText("Traffic: " + trafficLevel);
+    }
+
+    // CONTINUATION OF PostRequestActivity.java - PART 2
+// Add these methods to the class from PART 1
+
+    private void drawEncodedPolyline(String encodedPolyline) {
+        if (mMap == null) return;
+
         if (routePolyline != null) {
             routePolyline.remove();
         }
 
-        // Create a simple straight line for demo
+        List<LatLng> points = decodePolyline(encodedPolyline);
+        routePolyline = mMap.addPolyline(new PolylineOptions()
+                .addAll(points)
+                .width(8)
+                .color(getResources().getColor(android.R.color.holo_blue_dark))
+                .geodesic(true));
+
+        fitMapToRoute();
+    }
+
+    private void drawStraightLine() {
+        if (mMap == null || pickupLatLng == null || dropLatLng == null) return;
+
+        if (routePolyline != null) {
+            routePolyline.remove();
+        }
+
         routePolyline = mMap.addPolyline(new PolylineOptions()
                 .add(pickupLatLng, dropLatLng)
                 .width(8)
                 .color(getResources().getColor(android.R.color.holo_blue_dark))
                 .geodesic(true));
 
-        // Fit map to show both markers with padding
+        fitMapToRoute();
+    }
+
+    private void fitMapToRoute() {
+        if (pickupLatLng == null || dropLatLng == null) return;
+
         LatLngBounds.Builder builder = new LatLngBounds.Builder();
         builder.include(pickupLatLng);
         builder.include(dropLatLng);
@@ -373,28 +423,36 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 100));
     }
 
-    private String getTrafficLevel(int hour) {
-        if ((hour >= 8 && hour <= 9) || (hour >= 17 && hour <= 18)) {
-            return "Heavy";
-        } else if ((hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 19)) {
-            return "Moderate";
-        } else {
-            return "Light";
+    private List<LatLng> decodePolyline(String encoded) {
+        List<LatLng> poly = new ArrayList<>();
+        int index = 0, len = encoded.length();
+        int lat = 0, lng = 0;
+
+        while (index < len) {
+            int b, shift = 0, result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lat += dlat;
+
+            shift = 0;
+            result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lng += dlng;
+
+            LatLng p = new LatLng((((double) lat / 1E5)), (((double) lng / 1E5)));
+            poly.add(p);
         }
-    }
 
-    private void validateFormCompleteness() {
-        boolean pickupSelected = pickupLatLng != null;
-        boolean dropSelected = dropLatLng != null;
-        boolean fareEntered = !etFare.getText().toString().trim().isEmpty();
-        boolean timeSelected = !tvDepartureTime.getText().toString().equals("Tap to select date & time");
-
-        boolean isComplete = pickupSelected && dropSelected && fareEntered && timeSelected;
-
-        btnCheckFare.setEnabled(isComplete);
-        btnCheckFare.setBackgroundColor(isComplete ?
-                getResources().getColor(android.R.color.holo_blue_dark) :
-                getResources().getColor(android.R.color.darker_gray));
+        return poly;
     }
 
     private void showDateTimePicker() {
@@ -410,8 +468,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                 calendar.get(Calendar.MONTH),
                 calendar.get(Calendar.DAY_OF_MONTH)
         );
-
-        // Set minimum date to today
         datePickerDialog.getDatePicker().setMinDate(System.currentTimeMillis() - 1000);
         datePickerDialog.show();
     }
@@ -433,27 +489,39 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void updateTimeButton() {
-        String dateFormat = "MMM dd, yyyy hh:mm a";
-        SimpleDateFormat sdf = new SimpleDateFormat(dateFormat, Locale.getDefault());
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault());
         tvDepartureTime.setText(sdf.format(calendar.getTime()));
     }
 
+    private void validateFormCompleteness() {
+        boolean pickupSelected = pickupLatLng != null;
+        boolean dropSelected = dropLatLng != null;
+        boolean fareEntered = !etFare.getText().toString().trim().isEmpty();
+        boolean timeSelected = !tvDepartureTime.getText().toString().equals("Tap to select date & time");
+        boolean vehicleSelected = radioGroupVehicleType.getCheckedRadioButtonId() != -1;
+
+        boolean isComplete = pickupSelected && dropSelected && fareEntered && timeSelected && vehicleSelected;
+
+        btnCheckFare.setEnabled(isComplete);
+        btnCheckFare.setBackgroundColor(isComplete ?
+                getResources().getColor(android.R.color.holo_blue_dark) :
+                getResources().getColor(android.R.color.darker_gray));
+    }
+
     private void checkFareFairness() {
-        // Show loading
         btnCheckFare.setText("Calculating...");
         btnCheckFare.setEnabled(false);
+        layoutFareAnalysis.setVisibility(View.VISIBLE);
 
-        // Show fare analysis section
-        layoutFareAnalysis.setVisibility(android.view.View.VISIBLE);
-
-        // Calculate fare fairness
-        calculateFareFairness();
+        new Thread(() -> {
+            calculateFareFairness();
+            runOnUiThread(this::resetCheckFareButton);
+        }).start();
     }
 
     private void calculateFareFairness() {
         if (pickupLatLng == null || dropLatLng == null) {
-            showFareResult("Please select valid locations", false, "");
-            resetCheckFareButton();
+            runOnUiThread(() -> showFareResult("Please select valid locations", false, ""));
             return;
         }
 
@@ -461,56 +529,48 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         try {
             userFare = Double.parseDouble(etFare.getText().toString().trim());
         } catch (NumberFormatException e) {
-            showFareResult("Please enter a valid fare amount", false, "");
-            resetCheckFareButton();
+            runOnUiThread(() -> showFareResult("Please enter a valid fare amount", false, ""));
             return;
         }
 
-        // Calculate fair fare
         calculateFairFare(routeDistance, passengersCount);
 
-        // Check if user fare is within fair range
-        if (userFare >= minFairFare && userFare <= maxFairFare) {
-            String reason = getFareFairReason(userFare);
-            showFareResult("✓ Fare is fair! You can post your request.", true, reason);
-            enablePostButton();
-        } else {
-            String reason = getFareUnfairReason(userFare, routeDistance);
-            String suggestion = getFareSuggestion(userFare);
-            showFareResult("Fare needs adjustment", false, reason, suggestion);
-            disablePostButton();
-        }
+        final double finalUserFare = userFare;
+        runOnUiThread(() -> {
+            if (finalUserFare >= minFairFare && finalUserFare <= maxFairFare) {
+                String reason = getFareFairReason(finalUserFare);
+                showFareResult("✓ Fare is fair! You can post your request.", true, reason);
+                enablePostButton();
+            } else {
+                String reason = getFareUnfairReason(finalUserFare, routeDistance);
+                String suggestion = getFareSuggestion(finalUserFare);
+                showFareResult("Fare needs adjustment", false, reason, suggestion);
+                disablePostButton();
+            }
 
-        // Show fair range
-        tvFairRange.setText(String.format(Locale.getDefault(), "Fair range: ৳%d - ৳%d (Distance: %.1f km)",
-                (int)minFairFare, (int)maxFairFare, routeDistance));
-
-        resetCheckFareButton();
+            tvFairRange.setText(String.format(Locale.getDefault(),
+                    "Fair range: ৳%d - ৳%d (Distance: %.1f km)",
+                    (int)minFairFare, (int)maxFairFare, routeDistance));
+        });
     }
 
     private void calculateFairFare(double distance, int passengers) {
-        // Base fare calculation
         double baseFare = 60.0;
         double farePerKm = 15.0;
 
         calculatedFairFare = baseFare + (distance * farePerKm);
-
-        // Apply multipliers
         calculatedFairFare *= getTimeMultiplier();
         calculatedFairFare *= getTrafficMultiplier();
         calculatedFairFare *= getPassengerMultiplier(passengers);
         calculatedFairFare *= getDistanceMultiplier(distance);
 
-        // Apply traffic duration factor
-        double trafficFactor = Math.max(1.0, trafficDuration / routeDuration);
+        double trafficFactor = Math.max(1.0, trafficDuration / Math.max(routeDuration, 1.0));
         calculatedFairFare *= trafficFactor;
 
-        // Set fair range
         double range = Math.max(50, calculatedFairFare * 0.2);
         minFairFare = Math.max(calculatedFairFare - range, baseFare);
         maxFairFare = calculatedFairFare + range;
 
-        // Round to nearest 10
         minFairFare = Math.round(minFairFare / 10) * 10;
         maxFairFare = Math.round(maxFairFare / 10) * 10;
         calculatedFairFare = Math.round(calculatedFairFare / 10) * 10;
@@ -518,7 +578,7 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
 
     private String getFareFairReason(double userFare) {
         return String.format(Locale.getDefault(),
-                "Your fare of ৳%.0f is perfect for:\n• %.1f km distance\n• %s\n• %s traffic conditions\n• %d passenger%s",
+                "Your fare of ৳%.0f is perfect for:\n• %.1f km distance\n• %s\n• %s traffic\n• %d passenger%s",
                 userFare, routeDistance, getTimeOfDayDescription(),
                 getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)),
                 passengersCount, passengersCount > 1 ? "s" : "");
@@ -527,26 +587,25 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     private String getFareUnfairReason(double userFare, double distance) {
         if (userFare < minFairFare) {
             return String.format(Locale.getDefault(),
-                    "Your fare of ৳%.0f is too low because:\n• Distance: %.1f km\n• Time: %s\n• Traffic: %s\n• Additional %d passenger%s\n• Current traffic adds %.0f min extra travel time",
-                    userFare, distance, getTimeOfDayDescription(), getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)),
-                    passengersCount - 1, passengersCount > 2 ? "s" : "", trafficDuration - routeDuration);
+                    "Your fare of ৳%.0f is too low:\n• Distance: %.1f km\n• Time: %s\n• Traffic: %s",
+                    userFare, distance, getTimeOfDayDescription(),
+                    getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)));
         } else {
             return String.format(Locale.getDefault(),
-                    "Your fare of ৳%.0f is too high because:\n• Distance: %.1f km\n• Time: %s\n• Traffic: %s\n• Drivers may not accept this fare for the current conditions",
-                    userFare, distance, getTimeOfDayDescription(), getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)));
+                    "Your fare of ৳%.0f is too high:\n• Distance: %.1f km\n• May not attract drivers",
+                    userFare, distance);
         }
     }
 
     private String getFareSuggestion(double userFare) {
         if (userFare < minFairFare) {
             return String.format(Locale.getDefault(),
-                    "💡 Suggestion: Increase fare to ৳%d - ৳%d range to account for %s traffic and %s timing",
-                    (int)minFairFare, (int)maxFairFare, getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)).toLowerCase(),
-                    getTimeOfDayDescription());
+                    "💡 Increase to ৳%d - ৳%d for better matches",
+                    (int)minFairFare, (int)maxFairFare);
         } else {
             return String.format(Locale.getDefault(),
-                    "💡 Suggestion: Decrease fare to ৳%d - ৳%d range to attract more drivers for this %s trip",
-                    (int)minFairFare, (int)maxFairFare, routeDistance > 10 ? "long" : "short");
+                    "💡 Decrease to ৳%d - ৳%d to attract drivers",
+                    (int)minFairFare, (int)maxFairFare);
         }
     }
 
@@ -557,13 +616,13 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                 getResources().getColor(android.R.color.holo_red_dark));
 
         tvDetailedReason.setText(detailedReason);
-        tvDetailedReason.setVisibility(android.view.View.VISIBLE);
+        tvDetailedReason.setVisibility(View.VISIBLE);
 
         if (suggestion.length > 0) {
             tvSuggestion.setText(suggestion[0]);
-            tvSuggestion.setVisibility(android.view.View.VISIBLE);
+            tvSuggestion.setVisibility(View.VISIBLE);
         } else {
-            tvSuggestion.setVisibility(android.view.View.GONE);
+            tvSuggestion.setVisibility(View.GONE);
         }
     }
 
@@ -587,55 +646,75 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
 
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser == null) {
-            showFareResult("Please login to post a request", false, "You need to be logged in to post ride requests.");
+            Toast.makeText(this, "Please login to post", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Show loading
         btnPostRequest.setText("Posting...");
         btnPostRequest.setEnabled(false);
 
-        // Create ride request object
-        Map<String, Object> rideRequest = createRideRequestData(currentUser);
+        // Get user data from Firestore first
+        db.collection("users").document(currentUser.getUid())
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    Map<String, Object> rideRequest = createRideRequestData(currentUser, documentSnapshot);
 
-        // Save to Firebase
-        db.collection("ride_requests")
-                .add(rideRequest)
-                .addOnSuccessListener(documentReference -> {
-                    showFareResult("✓ Ride request posted successfully!", true, "Your request is now visible to drivers.");
-                    clearForm();
+                    db.collection("ride_requests")
+                            .add(rideRequest)
+                            .addOnSuccessListener(documentReference -> {
+                                Toast.makeText(this, "✓ Posted successfully!", Toast.LENGTH_SHORT).show();
+                                clearForm();
 
-                    // Navigate back after success
-                    new android.os.Handler().postDelayed(() -> {
-                        Intent intent = new Intent(PostRequestActivity.this, MainActivity.class);
-                        startActivity(intent);
-                        finish();
-                    }, 2000);
+                                new android.os.Handler().postDelayed(() -> {
+                                    Intent intent = new Intent(PostRequestActivity.this, MainActivity.class);
+                                    startActivity(intent);
+                                    finish();
+                                }, 2000);
+                            })
+                            .addOnFailureListener(e -> {
+                                Toast.makeText(this, "Failed to post: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                btnPostRequest.setText("Post Request");
+                                btnPostRequest.setEnabled(true);
+                            });
                 })
                 .addOnFailureListener(e -> {
-                    showFareResult("Failed to post ride request", false, "Error: " + e.getMessage());
+                    Toast.makeText(this, "Error fetching user data", Toast.LENGTH_SHORT).show();
                     btnPostRequest.setText("Post Request");
                     btnPostRequest.setEnabled(true);
                 });
     }
 
-    private Map<String, Object> createRideRequestData(FirebaseUser currentUser) {
+    private Map<String, Object> createRideRequestData(FirebaseUser currentUser,
+                                                      com.google.firebase.firestore.DocumentSnapshot userDoc) {
         Map<String, Object> rideRequest = new HashMap<>();
+
+        // Passenger info
         rideRequest.put("passengerId", currentUser.getUid());
-        rideRequest.put("passengerName", currentUser.getDisplayName() != null ?
-                currentUser.getDisplayName() : "Anonymous");
-        rideRequest.put("pickupLocation", tvPickupLocation.getText().toString());
-        rideRequest.put("dropLocation", tvDropLocation.getText().toString());
+        rideRequest.put("passengerName", userDoc.exists() ? userDoc.getString("fullName") : "Anonymous");
+        rideRequest.put("passengerPhone", userDoc.exists() ? userDoc.getString("phone") : "");
+        rideRequest.put("passengerPhoto", userDoc.exists() ? userDoc.getString("profileImageUrl") : "");
+        rideRequest.put("passengerRating", 4.5); // Default, should come from reviews later
+
+        // Trip details
+        rideRequest.put("pickupLocation", pickupAddress);
+        rideRequest.put("dropLocation", dropAddress);
         rideRequest.put("pickupLat", pickupLatLng.latitude);
         rideRequest.put("pickupLng", pickupLatLng.longitude);
         rideRequest.put("dropLat", dropLatLng.latitude);
         rideRequest.put("dropLng", dropLatLng.longitude);
+
+        // Fare and vehicle
         rideRequest.put("fare", Double.parseDouble(etFare.getText().toString().trim()));
+        rideRequest.put("vehicleType", vehicleType);
         rideRequest.put("passengers", passengersCount);
+
+        // Timing
         rideRequest.put("departureTime", calendar.getTimeInMillis());
+        rideRequest.put("createdAt", System.currentTimeMillis());
+
+        // Additional info
         rideRequest.put("specialRequest", etSpecialRequest.getText().toString().trim());
         rideRequest.put("status", "pending");
-        rideRequest.put("createdAt", System.currentTimeMillis());
         rideRequest.put("calculatedFairFare", calculatedFairFare);
         rideRequest.put("minFairFare", minFairFare);
         rideRequest.put("maxFairFare", maxFairFare);
@@ -649,89 +728,63 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
 
     private boolean validateForm() {
         if (pickupLatLng == null) {
-            showFareResult("Please select pickup location", false, "Tap on 'Pickup Location' to select from map.");
+            Toast.makeText(this, "Select pickup location", Toast.LENGTH_SHORT).show();
             return false;
         }
-
         if (dropLatLng == null) {
-            showFareResult("Please select drop location", false, "Tap on 'Drop Location' to select from map.");
+            Toast.makeText(this, "Select drop location", Toast.LENGTH_SHORT).show();
             return false;
         }
-
         if (etFare.getText().toString().trim().isEmpty()) {
-            showFareResult("Please enter fare amount", false, "Enter your proposed fare in the fare field.");
+            Toast.makeText(this, "Enter fare amount", Toast.LENGTH_SHORT).show();
             return false;
         }
-
+        if (radioGroupVehicleType.getCheckedRadioButtonId() == -1) {
+            Toast.makeText(this, "Select vehicle type", Toast.LENGTH_SHORT).show();
+            return false;
+        }
         return true;
     }
 
     private void clearForm() {
-        // Clear location selections
-        tvPickupLocation.setText("Tap to select pickup point on map");
-        tvDropLocation.setText("Tap to select drop point on map");
+        if (autocompletePickup != null) autocompletePickup.setText("");
+        if (autocompleteDrop != null) autocompleteDrop.setText("");
         pickupLatLng = null;
         dropLatLng = null;
-
-        // Clear time
+        pickupAddress = "";
+        dropAddress = "";
         tvDepartureTime.setText("Tap to select date & time");
-
-        // Clear fare and analysis
         etFare.setText("");
-        layoutFareAnalysis.setVisibility(android.view.View.GONE);
-
-        // Reset passengers
+        layoutFareAnalysis.setVisibility(View.GONE);
         passengersCount = 1;
         tvPassengersCount.setText("1");
-
-        // Clear special request
         etSpecialRequest.setText("");
+        radioGroupVehicleType.clearCheck();
 
-        // Clear map
-        if (mMap != null) {
-            mMap.clear();
-        }
+        if (mMap != null) mMap.clear();
         if (routePolyline != null) {
             routePolyline.remove();
             routePolyline = null;
         }
 
-        // Hide route preview
-        cardRoutePreview.setVisibility(android.view.View.GONE);
-        layoutTrafficInfo.setVisibility(android.view.View.GONE);
-
-        // Reset buttons
+        cardRoutePreview.setVisibility(View.GONE);
+        layoutTrafficInfo.setVisibility(View.GONE);
         btnPostRequest.setEnabled(false);
         btnPostRequest.setText("Post Request");
         btnCheckFare.setEnabled(false);
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        BottomNavigationHelper.setupBottomNavigation(this, "POST");
-    }
-
-    // Helper methods
     private double calculateHaversineDistance(LatLng point1, LatLng point2) {
-        double lat1 = point1.latitude;
-        double lon1 = point1.longitude;
-        double lat2 = point2.latitude;
-        double lon2 = point2.longitude;
-
-        double earthRadius = 6371; // kilometers
-
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
+        double earthRadius = 6371;
+        double dLat = Math.toRadians(point2.latitude - point1.latitude);
+        double dLon = Math.toRadians(point2.longitude - point1.longitude);
 
         double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.cos(Math.toRadians(point1.latitude)) * Math.cos(Math.toRadians(point2.latitude)) *
                         Math.sin(dLon/2) * Math.sin(dLon/2);
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        double distance = earthRadius * c;
-
-        return Math.max(distance, 1.0); // Minimum 1 km
+        return Math.max(earthRadius * c, 1.0);
     }
 
     private String getTimeOfDayDescription() {
@@ -741,30 +794,25 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         return "normal hours";
     }
 
+    private String getTrafficLevel(int hour) {
+        if ((hour >= 8 && hour <= 9) || (hour >= 17 && hour <= 18)) return "Heavy";
+        if ((hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 19)) return "Moderate";
+        return "Light";
+    }
+
     private double getTimeMultiplier() {
         int hour = calendar.get(Calendar.HOUR_OF_DAY);
         int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
-
-        if (dayOfWeek == Calendar.FRIDAY || dayOfWeek == Calendar.SATURDAY) {
-            return 1.2;
-        }
-        if ((hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 20)) {
-            return 1.3;
-        }
-        if (hour >= 22 || hour <= 5) {
-            return 1.4;
-        }
+        if (dayOfWeek == Calendar.FRIDAY || dayOfWeek == Calendar.SATURDAY) return 1.2;
+        if ((hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 20)) return 1.3;
+        if (hour >= 22 || hour <= 5) return 1.4;
         return 1.0;
     }
 
     private double getTrafficMultiplier() {
         int hour = calendar.get(Calendar.HOUR_OF_DAY);
-        if ((hour >= 8 && hour <= 9) || (hour >= 17 && hour <= 18)) {
-            return 1.25;
-        }
-        if ((hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 19)) {
-            return 1.15;
-        }
+        if ((hour >= 8 && hour <= 9) || (hour >= 17 && hour <= 18)) return 1.25;
+        if ((hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 19)) return 1.15;
         return 1.0;
     }
 
@@ -773,11 +821,18 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     }
 
     private double getDistanceMultiplier(double distance) {
-        if (distance > 20) {
-            return 0.9;
-        } else if (distance > 10) {
-            return 0.95;
-        }
+        if (distance > 20) return 0.9;
+        if (distance > 10) return 0.95;
         return 1.0;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        try {
+            BottomNavigationHelper.setupBottomNavigation(this, "POST");
+        } catch (Exception e) {
+            Log.e(TAG, "Bottom navigation setup failed", e);
+        }
     }
 }

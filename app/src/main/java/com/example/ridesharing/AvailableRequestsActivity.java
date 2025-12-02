@@ -1,149 +1,205 @@
 package com.example.ridesharing;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.ListenerRegistration;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
 public class AvailableRequestsActivity extends AppCompatActivity implements RideRequestAdapter.OnRequestClickListener {
 
+    private static final String TAG = "AvailableRequests";
+
+    // UI Components
     private RecyclerView requestsRecyclerView;
     private RideRequestAdapter requestAdapter;
     private View emptyStateLayout, searchPanel;
+    private ProgressBar progressBar;
     private TextView requestsCountText, subtitleText;
     private Chip chipActiveFilter;
     private TextInputEditText etFromLocation, etToLocation;
+    private ImageView filterButton;
+    private View refreshButton;
+
+    // Data Lists
     private List<RideRequest> requestList = new ArrayList<>();
     private List<RideRequest> filteredList = new ArrayList<>();
+
+    // Firebase
+    private FirebaseFirestore db;
+    private FirebaseAuth mAuth;
+    private ListenerRegistration requestsListener;
+
+    // Search State
     private boolean isSearchActive = false;
     private String currentFromFilter = "";
     private String currentToFilter = "";
+
+    // Loading state
+    private boolean isLoading = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_available_requests);
 
+        initializeFirebase();
         initializeViews();
         setupRecyclerView();
         setupSearchFunctionality();
-        loadSampleRequests();
+        loadRideRequests();
 
-        BottomNavigationHelper.setupBottomNavigation(this, "HOME");
+        try {
+            BottomNavigationHelper.setupBottomNavigation(this, "HOME");
+        } catch (Exception e) {
+            Log.e(TAG, "Bottom navigation setup failed", e);
+        }
+    }
+
+    private void initializeFirebase() {
+        db = FirebaseFirestore.getInstance();
+        mAuth = FirebaseAuth.getInstance();
     }
 
     private void initializeViews() {
         requestsRecyclerView = findViewById(R.id.requests_recyclerview);
         emptyStateLayout = findViewById(R.id.empty_state_layout);
+        progressBar = findViewById(R.id.progress_bar);
         searchPanel = findViewById(R.id.search_panel);
         chipActiveFilter = findViewById(R.id.chip_active_filter);
         requestsCountText = findViewById(R.id.requests_count_text);
         subtitleText = findViewById(R.id.subtitle_text);
         etFromLocation = findViewById(R.id.et_from_location);
         etToLocation = findViewById(R.id.et_to_location);
+        filterButton = findViewById(R.id.filter_button);
 
-        // Setup filter button
-        ImageView filterButton = findViewById(R.id.filter_button);
-        filterButton.setOnClickListener(v -> toggleSearchPanel());
+        if (filterButton != null) {
+            filterButton.setOnClickListener(v -> toggleSearchPanel());
+        }
 
-        // Setup refresh button
-        View refreshButton = emptyStateLayout.findViewById(R.id.btn_refresh);
+        refreshButton = emptyStateLayout != null ? emptyStateLayout.findViewById(R.id.btn_refresh) : null;
         if (refreshButton != null) {
-            refreshButton.setOnClickListener(v -> loadSampleRequests());
+            refreshButton.setOnClickListener(v -> loadRideRequests());
         }
     }
 
     private void setupSearchFunctionality() {
-        // Confirm search button
         View btnConfirmSearch = findViewById(R.id.btn_confirm_search);
-        btnConfirmSearch.setOnClickListener(v -> applySearchFilter());
+        if (btnConfirmSearch != null) {
+            btnConfirmSearch.setOnClickListener(v -> applySearchFilter());
+        }
 
-        // Cancel search button
         View btnCancelSearch = findViewById(R.id.btn_cancel_search);
-        btnCancelSearch.setOnClickListener(v -> cancelSearch());
+        if (btnCancelSearch != null) {
+            btnCancelSearch.setOnClickListener(v -> cancelSearch());
+        }
 
-        // Close active filter chip
-        chipActiveFilter.setOnCloseIconClickListener(v -> clearSearchFilter());
+        if (chipActiveFilter != null) {
+            chipActiveFilter.setOnCloseIconClickListener(v -> clearSearchFilter());
+        }
 
-        // Real-time search as user types (optional)
-        etFromLocation.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                if (isSearchActive) {
-                    applySearchFilter();
+        if (etFromLocation != null) {
+            etFromLocation.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (isSearchActive) {
+                        applySearchFilter();
+                    }
                 }
-            }
-        });
+            });
+        }
 
-        etToLocation.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                if (isSearchActive) {
-                    applySearchFilter();
+        if (etToLocation != null) {
+            etToLocation.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (isSearchActive) {
+                        applySearchFilter();
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     private void toggleSearchPanel() {
-        if (searchPanel.getVisibility() == View.VISIBLE) {
-            hideSearchPanel();
-        } else {
-            showSearchPanel();
+        if (searchPanel != null) {
+            if (searchPanel.getVisibility() == View.VISIBLE) {
+                hideSearchPanel();
+            } else {
+                showSearchPanel();
+            }
         }
     }
 
     private void showSearchPanel() {
-        searchPanel.setVisibility(View.VISIBLE);
-        // Auto-focus on from field
-        etFromLocation.requestFocus();
-        // Show keyboard
-        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-        imm.showSoftInput(etFromLocation, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+        if (searchPanel != null) {
+            searchPanel.setVisibility(View.VISIBLE);
+        }
+        if (etFromLocation != null) {
+            etFromLocation.requestFocus();
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(etFromLocation, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }
+        }
     }
 
     private void hideSearchPanel() {
-        searchPanel.setVisibility(View.GONE);
-        // Hide keyboard
-        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-        imm.hideSoftInputFromWindow(etFromLocation.getWindowToken(), 0);
+        if (searchPanel != null) {
+            searchPanel.setVisibility(View.GONE);
+        }
+        if (etFromLocation != null) {
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(etFromLocation.getWindowToken(), 0);
+            }
+        }
     }
 
     private void applySearchFilter() {
-        String from = etFromLocation.getText().toString().trim().toLowerCase(Locale.ROOT);
-        String to = etToLocation.getText().toString().trim().toLowerCase(Locale.ROOT);
+        String from = etFromLocation != null ? etFromLocation.getText().toString().trim().toLowerCase(Locale.ROOT) : "";
+        String to = etToLocation != null ? etToLocation.getText().toString().trim().toLowerCase(Locale.ROOT) : "";
 
         currentFromFilter = from;
         currentToFilter = to;
 
-        // Filter the list
         filteredList.clear();
         for (RideRequest request : requestList) {
-            boolean matchesFrom = from.isEmpty() ||
-                    request.getSource().toLowerCase(Locale.ROOT).contains(from);
-            boolean matchesTo = to.isEmpty() ||
-                    request.getDestination().toLowerCase(Locale.ROOT).contains(to);
+            String source = request.getSource();
+            String destination = request.getDestination();
+
+            boolean matchesFrom = from.isEmpty() || (source != null && source.toLowerCase(Locale.ROOT).contains(from));
+            boolean matchesTo = to.isEmpty() || (destination != null && destination.toLowerCase(Locale.ROOT).contains(to));
 
             if (matchesFrom && matchesTo) {
                 filteredList.add(request);
@@ -152,13 +208,13 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
 
         isSearchActive = !from.isEmpty() || !to.isEmpty();
 
-        if (isSearchActive) {
+        if (isSearchActive && chipActiveFilter != null) {
             chipActiveFilter.setVisibility(View.VISIBLE);
             String filterText = "Filter: ";
             if (!from.isEmpty()) filterText += "From " + from;
             if (!to.isEmpty()) filterText += (from.isEmpty() ? "To " : " to ") + to;
             chipActiveFilter.setText(filterText);
-        } else {
+        } else if (chipActiveFilter != null) {
             chipActiveFilter.setVisibility(View.GONE);
         }
 
@@ -168,79 +224,255 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
 
     private void cancelSearch() {
         hideSearchPanel();
-        // Clear filters but keep the text in fields
-        isSearchActive = false;
-        chipActiveFilter.setVisibility(View.GONE);
-        updateUIWithFilteredResults();
     }
 
     private void clearSearchFilter() {
-        etFromLocation.setText("");
-        etToLocation.setText("");
+        if (etFromLocation != null) etFromLocation.setText("");
+        if (etToLocation != null) etToLocation.setText("");
         currentFromFilter = "";
         currentToFilter = "";
         isSearchActive = false;
-        chipActiveFilter.setVisibility(View.GONE);
+        if (chipActiveFilter != null) chipActiveFilter.setVisibility(View.GONE);
         updateUIWithFilteredResults();
     }
 
     private void setupRecyclerView() {
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         requestsRecyclerView.setLayoutManager(layoutManager);
-
         requestAdapter = new RideRequestAdapter(filteredList, this);
         requestsRecyclerView.setAdapter(requestAdapter);
     }
 
-    private void loadSampleRequests() {
+    private void loadRideRequests() {
+        if (isLoading) {
+            Log.d(TAG, "Already loading, skipping duplicate call");
+            return;
+        }
+
+        isLoading = true;
         showLoadingState();
 
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            List<RideRequest> sampleRequests = createSampleRequests();
-            requestList.clear();
-            requestList.addAll(sampleRequests);
+        // Remove existing listener
+        if (requestsListener != null) {
+            requestsListener.remove();
+            requestsListener = null;
+        }
 
-            // Apply current filter if any
-            if (isSearchActive) {
-                applySearchFilter();
-            } else {
-                filteredList.clear();
-                filteredList.addAll(requestList);
-                requestAdapter.updateRequests(filteredList);
-                updateUIState();
-            }
-        }, 1000);
+        Log.d(TAG, "Starting to load ride requests...");
+
+        // Simple query without orderBy to avoid index issues
+        requestsListener = db.collection("ride_requests")
+                .whereEqualTo("status", "pending")
+                .addSnapshotListener((queryDocumentSnapshots, error) -> {
+
+                    isLoading = false;
+
+                    if (error != null) {
+                        Log.e(TAG, "Firestore error: " + error.getMessage(), error);
+                        runOnUiThread(() -> {
+                            hideLoadingState();
+                            showEmptyState("Error: " + error.getMessage());
+                            Toast.makeText(AvailableRequestsActivity.this,
+                                    "Connection error. Check your internet.", Toast.LENGTH_LONG).show();
+                        });
+                        return;
+                    }
+
+                    if (queryDocumentSnapshots == null) {
+                        Log.e(TAG, "QueryDocumentSnapshots is null");
+                        runOnUiThread(() -> {
+                            hideLoadingState();
+                            showEmptyState("No data received");
+                        });
+                        return;
+                    }
+
+                    Log.d(TAG, "Received " + queryDocumentSnapshots.size() + " documents");
+
+                    List<RideRequest> newRequests = new ArrayList<>();
+
+                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
+                        try {
+                            Log.d(TAG, "Parsing document: " + document.getId());
+                            RideRequest request = parseRideRequestFromFirestore(document);
+                            if (request != null) {
+                                newRequests.add(request);
+                                Log.d(TAG, "Successfully parsed: " + request.getPassengerName());
+                            } else {
+                                Log.w(TAG, "Request parsed as null for document: " + document.getId());
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Exception parsing document " + document.getId() + ": " + e.getMessage(), e);
+                        }
+                    }
+
+                    // Sort by createdAt in memory (newest first)
+                    Collections.sort(newRequests, new Comparator<RideRequest>() {
+                        @Override
+                        public int compare(RideRequest r1, RideRequest r2) {
+                            // You'll need to store createdAt in RideRequest for this
+                            // For now, just keep the order as is
+                            return 0;
+                        }
+                    });
+
+                    runOnUiThread(() -> {
+                        requestList.clear();
+                        requestList.addAll(newRequests);
+
+                        Log.d(TAG, "Updated request list with " + requestList.size() + " items");
+
+                        if (isSearchActive) {
+                            applySearchFilter();
+                        } else {
+                            filteredList.clear();
+                            filteredList.addAll(requestList);
+                            if (requestAdapter != null) {
+                                requestAdapter.updateRequests(filteredList);
+                            }
+                        }
+
+                        hideLoadingState();
+                        updateUIState();
+                    });
+                });
     }
 
-    private List<RideRequest> createSampleRequests() {
-        List<RideRequest> requests = new ArrayList<>();
+    private RideRequest parseRideRequestFromFirestore(QueryDocumentSnapshot document) {
+        try {
+            String id = document.getId();
+            Log.d(TAG, "Parsing document ID: " + id);
 
-        requests.add(new RideRequest("1", "Alice Johnson", "Student", 4.8,
-                "EWU Main Campus, Aftabnagar", "Bashundhara City Mall",
-                "2:30 PM", "3:15 PM", 120.0, "alice123", 2, "Urgent: Exam tomorrow"));
+            // Get all fields with extensive null checking
+            String passengerName = document.contains("passengerName") ? document.getString("passengerName") : null;
+            if (passengerName == null || passengerName.trim().isEmpty()) {
+                passengerName = "Anonymous Passenger";
+            }
 
-        requests.add(new RideRequest("2", "Bob Smith", "Professional", 4.9,
-                "EWU Permanent Campus", "Jamuna Future Park",
-                "4:00 PM", "4:45 PM", 150.0, "bob456", 1, "Shopping trip"));
+            String passengerPhoto = document.contains("passengerPhoto") ? document.getString("passengerPhoto") : "";
+            String passengerPhone = document.contains("passengerPhone") ? document.getString("passengerPhone") : "";
+            String passengerId = document.contains("passengerId") ? document.getString("passengerId") : "";
 
-        requests.add(new RideRequest("3", "Carol Davis", "Teacher", 4.7,
-                "Rampura Bridge", "Airport Area",
-                "5:30 PM", "6:15 PM", 200.0, "carol789", 1, "Going to class"));
+            Double rating = document.contains("passengerRating") ? document.getDouble("passengerRating") : null;
+            if (rating == null) rating = 4.5;
 
-        requests.add(new RideRequest("4", "David Wilson", "Engineer", 4.6,
-                "Bashundhara R/A", "EWU Main Campus",
-                "6:00 PM", "6:40 PM", 80.0, "david101", 3, "Pickup needed"));
+            String pickupLocation = document.contains("pickupLocation") ? document.getString("pickupLocation") : null;
+            if (pickupLocation == null || pickupLocation.trim().isEmpty()) {
+                pickupLocation = "Pickup Location";
+            }
 
-        return requests;
+            String dropLocation = document.contains("dropLocation") ? document.getString("dropLocation") : null;
+            if (dropLocation == null || dropLocation.trim().isEmpty()) {
+                dropLocation = "Drop Location";
+            }
+
+            Double pickupLat = document.contains("pickupLat") ? document.getDouble("pickupLat") : null;
+            Double pickupLng = document.contains("pickupLng") ? document.getDouble("pickupLng") : null;
+            Double dropLat = document.contains("dropLat") ? document.getDouble("dropLat") : null;
+            Double dropLng = document.contains("dropLng") ? document.getDouble("dropLng") : null;
+
+            Double fare = document.contains("fare") ? document.getDouble("fare") : null;
+            if (fare == null) fare = 0.0;
+
+            String vehicleType = document.contains("vehicleType") ? document.getString("vehicleType") : null;
+            if (vehicleType == null || vehicleType.trim().isEmpty()) {
+                vehicleType = "car";
+            }
+
+            Long passengersLong = document.contains("passengers") ? document.getLong("passengers") : null;
+            int passengers = passengersLong != null ? passengersLong.intValue() : 1;
+
+            Long departureTime = document.contains("departureTime") ? document.getLong("departureTime") : null;
+            Long createdAt = document.contains("createdAt") ? document.getLong("createdAt") : null;
+
+            String specialRequest = document.contains("specialRequest") ? document.getString("specialRequest") : "";
+            if (specialRequest == null) specialRequest = "";
+
+            Double distance = document.contains("distance") ? document.getDouble("distance") : null;
+            Double duration = document.contains("duration") ? document.getDouble("duration") : null;
+            String trafficLevel = document.contains("trafficLevel") ? document.getString("trafficLevel") : "Unknown";
+
+            // Calculate time remaining
+            long currentTime = System.currentTimeMillis();
+            long timeRemaining = 0;
+            if (departureTime != null) {
+                timeRemaining = departureTime - currentTime;
+            }
+            String timeRemainingStr = formatTimeRemaining(timeRemaining);
+
+            // Format departure time
+            String departureTimeStr = "Now";
+            if (departureTime != null) {
+                try {
+                    departureTimeStr = new java.text.SimpleDateFormat("hh:mm a", Locale.getDefault())
+                            .format(new java.util.Date(departureTime));
+                } catch (Exception e) {
+                    Log.e(TAG, "Error formatting departure time", e);
+                    departureTimeStr = "Now";
+                }
+            }
+
+            String userType = "Passenger";
+
+            Log.d(TAG, "Successfully created RideRequest for: " + passengerName);
+
+            return new RideRequest(
+                    id,
+                    passengerName,
+                    userType,
+                    rating,
+                    pickupLocation,
+                    dropLocation,
+                    departureTimeStr,
+                    timeRemainingStr,
+                    fare,
+                    passengerId,
+                    passengers,
+                    specialRequest,
+                    passengerPhoto,
+                    passengerPhone,
+                    vehicleType,
+                    pickupLat, pickupLng, dropLat, dropLng,
+                    distance, duration, trafficLevel
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "Critical error parsing document: " + e.getMessage(), e);
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private String formatTimeRemaining(long milliseconds) {
+        if (milliseconds <= 0) {
+            return "Now";
+        }
+
+        long hours = milliseconds / (1000 * 60 * 60);
+        long minutes = (milliseconds % (1000 * 60 * 60)) / (1000 * 60);
+
+        if (hours > 24) {
+            long days = hours / 24;
+            return days + " day" + (days > 1 ? "s" : "");
+        } else if (hours > 0) {
+            return hours + "h " + minutes + "m";
+        } else if (minutes > 0) {
+            return minutes + " min";
+        } else {
+            return "Now";
+        }
     }
 
     private void updateUIWithFilteredResults() {
         if (isSearchActive) {
-            requestAdapter.updateRequests(filteredList);
+            if (requestAdapter != null) {
+                requestAdapter.updateRequests(filteredList);
+            }
         } else {
             filteredList.clear();
             filteredList.addAll(requestList);
-            requestAdapter.updateRequests(filteredList);
+            if (requestAdapter != null) {
+                requestAdapter.updateRequests(filteredList);
+            }
         }
         updateUIState();
     }
@@ -249,59 +481,200 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
         List<RideRequest> displayList = isSearchActive ? filteredList : requestList;
 
         if (displayList.isEmpty()) {
-            emptyStateLayout.setVisibility(View.VISIBLE);
-            requestsRecyclerView.setVisibility(View.GONE);
+            if (emptyStateLayout != null) emptyStateLayout.setVisibility(View.VISIBLE);
+            if (requestsRecyclerView != null) requestsRecyclerView.setVisibility(View.GONE);
 
-            if (isSearchActive) {
-                subtitleText.setText("No matching ride requests found");
-            } else {
-                subtitleText.setText("No ride requests available at the moment");
+            if (subtitleText != null) {
+                if (isSearchActive) {
+                    subtitleText.setText("No matching ride requests found");
+                } else {
+                    subtitleText.setText("No ride requests available at the moment");
+                }
             }
         } else {
-            emptyStateLayout.setVisibility(View.GONE);
-            requestsRecyclerView.setVisibility(View.VISIBLE);
+            if (emptyStateLayout != null) emptyStateLayout.setVisibility(View.GONE);
+            if (requestsRecyclerView != null) requestsRecyclerView.setVisibility(View.VISIBLE);
 
-            if (isSearchActive) {
-                subtitleText.setText("Found " + displayList.size() + " matching requests");
-            } else {
-                subtitleText.setText(displayList.size() + " ride requests near you");
+            if (subtitleText != null) {
+                if (isSearchActive) {
+                    subtitleText.setText("Found " + displayList.size() + " matching requests");
+                } else {
+                    subtitleText.setText(displayList.size() + " ride requests available");
+                }
             }
         }
     }
 
     private void showLoadingState() {
-        emptyStateLayout.setVisibility(View.GONE);
-        requestsRecyclerView.setVisibility(View.VISIBLE);
-        subtitleText.setText("Loading ride requests...");
+        runOnUiThread(() -> {
+            if (progressBar != null) {
+                progressBar.setVisibility(View.VISIBLE);
+            }
+            if (emptyStateLayout != null) {
+                emptyStateLayout.setVisibility(View.GONE);
+            }
+            if (requestsRecyclerView != null) {
+                requestsRecyclerView.setVisibility(View.GONE);
+            }
+            if (subtitleText != null) {
+                subtitleText.setText("Loading ride requests...");
+            }
+        });
     }
 
-    // ... rest of your existing methods (onAcceptRequestClick, etc.)
+    private void hideLoadingState() {
+        runOnUiThread(() -> {
+            if (progressBar != null) {
+                progressBar.setVisibility(View.GONE);
+            }
+        });
+    }
+
+    private void showEmptyState(String message) {
+        runOnUiThread(() -> {
+            if (emptyStateLayout != null) {
+                emptyStateLayout.setVisibility(View.VISIBLE);
+            }
+            if (requestsRecyclerView != null) {
+                requestsRecyclerView.setVisibility(View.GONE);
+            }
+            if (subtitleText != null) {
+                subtitleText.setText(message);
+            }
+        });
+    }
 
     @Override
     public void onAcceptRequestClick(RideRequest request) {
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-        builder.setTitle("Accept Ride Request")
-                .setMessage("Accept ride request from " + request.getPassengerName() + " for ৳" + request.getOfferedFare() + "?")
-                .setPositiveButton("Accept", (dialog, which) -> {
-                    android.widget.Toast.makeText(this, "Ride request accepted! Contacting " + request.getPassengerName(), android.widget.Toast.LENGTH_SHORT).show();
-                })
+        if (mAuth.getCurrentUser() == null) {
+            Toast.makeText(this, "Please login to accept requests", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Accept Ride Request")
+                .setMessage("Accept ride from " + request.getPassengerName() +
+                        "\n\nFare: ৳" + String.format(Locale.getDefault(), "%.0f", request.getOfferedFare()) +
+                        "\nVehicle: " + (request.getVehicleType() != null ? request.getVehicleType().toUpperCase() : "CAR") +
+                        "\nPassengers: " + request.getPassengers() +
+                        "\nDistance: " + (request.getDistance() != null ? String.format(Locale.getDefault(), "%.1f km", request.getDistance()) : "N/A"))
+                .setPositiveButton("Accept", (dialog, which) -> acceptRideRequest(request))
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
+    private void acceptRideRequest(RideRequest request) {
+        String driverId = mAuth.getCurrentUser().getUid();
+        String driverName = mAuth.getCurrentUser().getDisplayName();
+
+        Toast.makeText(this, "Accepting request...", Toast.LENGTH_SHORT).show();
+
+        db.collection("ride_requests").document(request.getId())
+                .update(
+                        "status", "accepted",
+                        "driverId", driverId,
+                        "driverName", driverName != null ? driverName : "Driver",
+                        "acceptedAt", System.currentTimeMillis()
+                )
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "✓ Request accepted! Contact " + request.getPassengerName(),
+                            Toast.LENGTH_LONG).show();
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to accept request: " + e.getMessage(),
+                            Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Error accepting request", e);
+                });
+    }
+
     @Override
     public void onPassengerProfileClick(RideRequest request) {
-        android.widget.Toast.makeText(this, "Viewing " + request.getPassengerName() + "'s profile", android.widget.Toast.LENGTH_SHORT).show();
+        String profileInfo = "Name: " + request.getPassengerName() +
+                "\n\nRating: " + String.format(Locale.getDefault(), "%.1f", request.getRating()) + " ⭐" +
+                "\n\nType: " + request.getUserType();
+
+        if (request.getPassengerPhone() != null && !request.getPassengerPhone().isEmpty()) {
+            profileInfo += "\n\nPhone: " + request.getPassengerPhone();
+        }
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Passenger Profile")
+                .setMessage(profileInfo)
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Call", (dialog, which) -> onCallPassengerClick(request))
+                .show();
     }
 
     @Override
     public void onMessagePassengerClick(RideRequest request) {
-        android.widget.Toast.makeText(this, "Messaging " + request.getPassengerName(), android.widget.Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Messaging feature coming soon for " + request.getPassengerName(),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onCallPassengerClick(RideRequest request) {
+        if (request.getPassengerPhone() != null && !request.getPassengerPhone().isEmpty()) {
+            try {
+                Intent intent = new Intent(Intent.ACTION_DIAL);
+                intent.setData(Uri.parse("tel:" + request.getPassengerPhone()));
+                startActivity(intent);
+            } catch (Exception e) {
+                Toast.makeText(this, "Unable to open phone dialer", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Error opening dialer", e);
+            }
+        } else {
+            Toast.makeText(this, "Phone number not available", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void onViewMapClick(RideRequest request) {
+        if (request.getPickupLat() != null && request.getPickupLng() != null &&
+                request.getDropLat() != null && request.getDropLng() != null) {
+            try {
+                String uri = String.format(Locale.ENGLISH,
+                        "http://maps.google.com/maps?saddr=%f,%f&daddr=%f,%f",
+                        request.getPickupLat(), request.getPickupLng(),
+                        request.getDropLat(), request.getDropLng());
+
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+                intent.setPackage("com.google.android.apps.maps");
+                startActivity(intent);
+            } catch (Exception e) {
+                String uri = String.format(Locale.ENGLISH,
+                        "http://maps.google.com/maps?saddr=%f,%f&daddr=%f,%f",
+                        request.getPickupLat(), request.getPickupLng(),
+                        request.getDropLat(), request.getDropLng());
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+                startActivity(intent);
+            }
+        } else {
+            Toast.makeText(this, "Location data not available", Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        BottomNavigationHelper.setupBottomNavigation(this, "HOME");
+        try {
+            BottomNavigationHelper.setupBottomNavigation(this, "HOME");
+        } catch (Exception e) {
+            Log.e(TAG, "Bottom navigation setup failed", e);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (requestsListener != null) {
+            requestsListener.remove();
+            requestsListener = null;
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        hideSearchPanel();
     }
 }

@@ -3,74 +3,105 @@ package com.example.ridesharing;
 public class RideRequest {
     private String id;
     private String passengerName;
-    private String passengerType;
+    private String userType;
     private double rating;
     private String source;
     private String destination;
-    private String preferredTime;
-    private String estimatedArrival;
+    private String departureTime;
+    private String timeRemaining;
     private double offeredFare;
     private String passengerId;
-    private int passengersCount;
+    private int passengers;
     private String specialRequest;
+    private String passengerPhoto;
+    private String passengerPhone;
+    private String vehicleType;
+    private Double pickupLat;
+    private Double pickupLng;
+    private Double dropLat;
+    private Double dropLng;
+    private Double distance;
+    private Double duration;
+    private String trafficLevel;
 
-    // Empty constructor (needed for Firebase)
-    public RideRequest() {
-    }
-
-    // Constructor with parameters
-    public RideRequest(String id, String passengerName, String passengerType, double rating,
-                       String source, String destination, String preferredTime,
-                       String estimatedArrival, double offeredFare, String passengerId,
-                       int passengersCount, String specialRequest) {
+    public RideRequest(String id, String passengerName, String userType, double rating,
+                       String source, String destination, String departureTime,
+                       String timeRemaining, double offeredFare, String passengerId,
+                       int passengers, String specialRequest) {
         this.id = id;
         this.passengerName = passengerName;
-        this.passengerType = passengerType;
+        this.userType = userType;
         this.rating = rating;
         this.source = source;
         this.destination = destination;
-        this.preferredTime = preferredTime;
-        this.estimatedArrival = estimatedArrival;
+        this.departureTime = departureTime;
+        this.timeRemaining = timeRemaining;
         this.offeredFare = offeredFare;
         this.passengerId = passengerId;
-        this.passengersCount = passengersCount;
+        this.passengers = passengers;
         this.specialRequest = specialRequest;
     }
 
-    // Getters and Setters
+    // Enhanced constructor with all fields
+    public RideRequest(String id, String passengerName, String userType, double rating,
+                       String source, String destination, String departureTime,
+                       String timeRemaining, double offeredFare, String passengerId,
+                       int passengers, String specialRequest, String passengerPhoto,
+                       String passengerPhone, String vehicleType, Double pickupLat,
+                       Double pickupLng, Double dropLat, Double dropLng, Double distance,
+                       Double duration, String trafficLevel) {
+        this(id, passengerName, userType, rating, source, destination, departureTime,
+                timeRemaining, offeredFare, passengerId, passengers, specialRequest);
+        this.passengerPhoto = passengerPhoto;
+        this.passengerPhone = passengerPhone;
+        this.vehicleType = vehicleType;
+        this.pickupLat = pickupLat;
+        this.pickupLng = pickupLng;
+        this.dropLat = dropLat;
+        this.dropLng = dropLng;
+        this.distance = distance;
+        this.duration = duration;
+        this.trafficLevel = trafficLevel;
+    }
+
+    // Getters
     public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-
     public String getPassengerName() { return passengerName; }
-    public void setPassengerName(String passengerName) { this.passengerName = passengerName; }
-
-    public String getPassengerType() { return passengerType; }
-    public void setPassengerType(String passengerType) { this.passengerType = passengerType; }
-
+    public String getUserType() { return userType; }
     public double getRating() { return rating; }
-    public void setRating(double rating) { this.rating = rating; }
-
     public String getSource() { return source; }
-    public void setSource(String source) { this.source = source; }
-
     public String getDestination() { return destination; }
-    public void setDestination(String destination) { this.destination = destination; }
-
-    public String getPreferredTime() { return preferredTime; }
-    public void setPreferredTime(String preferredTime) { this.preferredTime = preferredTime; }
-
-    public String getEstimatedArrival() { return estimatedArrival; }
-    public void setEstimatedArrival(String estimatedArrival) { this.estimatedArrival = estimatedArrival; }
-
+    public String getDepartureTime() { return departureTime; }
+    public String getTimeRemaining() { return timeRemaining; }
     public double getOfferedFare() { return offeredFare; }
-    public void setOfferedFare(double offeredFare) { this.offeredFare = offeredFare; }
-
     public String getPassengerId() { return passengerId; }
-    public void setPassengerId(String passengerId) { this.passengerId = passengerId; }
-
-    public int getPassengersCount() { return passengersCount; }
-    public void setPassengersCount(int passengersCount) { this.passengersCount = passengersCount; }
-
+    public int getPassengers() { return passengers; }
     public String getSpecialRequest() { return specialRequest; }
+    public String getPassengerPhoto() { return passengerPhoto; }
+    public String getPassengerPhone() { return passengerPhone; }
+    public String getVehicleType() { return vehicleType; }
+    public Double getPickupLat() { return pickupLat; }
+    public Double getPickupLng() { return pickupLng; }
+    public Double getDropLat() { return dropLat; }
+    public Double getDropLng() { return dropLng; } // FIXED: was dropLng()
+    public Double getDistance() { return distance; }
+    public Double getDuration() { return duration; }
+    public String getTrafficLevel() { return trafficLevel; }
+
+    // Setters
+    public void setId(String id) { this.id = id; }
+    public void setPassengerName(String passengerName) { this.passengerName = passengerName; }
+    public void setUserType(String userType) { this.userType = userType; }
+    public void setRating(double rating) { this.rating = rating; }
+    public void setSource(String source) { this.source = source; }
+    public void setDestination(String destination) { this.destination = destination; }
+    public void setDepartureTime(String departureTime) { this.departureTime = departureTime; }
+    public void setTimeRemaining(String timeRemaining) { this.timeRemaining = timeRemaining; }
+    public void setOfferedFare(double offeredFare) { this.offeredFare = offeredFare; }
+    public void setPassengerId(String passengerId) { this.passengerId = passengerId; }
+    public void setPassengers(int passengers) { this.passengers = passengers; }
     public void setSpecialRequest(String specialRequest) { this.specialRequest = specialRequest; }
+    public void setPassengerPhoto(String passengerPhoto) { this.passengerPhoto = passengerPhoto; }
+    public void setPassengerPhone(String passengerPhone) { this.passengerPhone = passengerPhone; }
+    public void setVehicleType(String vehicleType) { this.vehicleType = vehicleType; }
 }

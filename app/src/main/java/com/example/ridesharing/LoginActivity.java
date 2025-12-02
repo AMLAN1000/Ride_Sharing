@@ -78,7 +78,7 @@ public class LoginActivity extends AppCompatActivity {
 
         // Configure Google Sign In with Web Client ID from your JSON
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken("482721895597-igo9hnlbbuutdglmgl0is2aba7oti3e1.apps.googleusercontent.com") // Web client ID
+                .requestIdToken("482721895597-igo9hnlbbuutdglmgl0is2aba7oti3e1.apps.googleusercontent.com")
                 .requestEmail()
                 .build();
 
@@ -145,7 +145,6 @@ public class LoginActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == RC_SIGN_IN) {
-            showLoading(false);
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
@@ -153,15 +152,16 @@ public class LoginActivity extends AppCompatActivity {
 
                 // Check if Google account email has correct domain
                 if (account.getEmail() != null && account.getEmail().endsWith(REQUIRED_EMAIL_DOMAIN)) {
-                    showLoading(true);
                     firebaseAuthWithGoogle(account.getIdToken());
                 } else {
+                    showLoading(false);
                     Toast.makeText(this, "Please use your @std.ewubd.edu email account", Toast.LENGTH_LONG).show();
-                    mGoogleSignInClient.signOut(); // Sign out from Google
+                    mGoogleSignInClient.signOut();
                     Log.d(TAG, "Invalid email domain: " + account.getEmail());
                 }
             } catch (ApiException e) {
                 Log.w(TAG, "Google sign in failed", e);
+                showLoading(false);
                 Toast.makeText(this, "Google sign in failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }
         }
@@ -173,16 +173,19 @@ public class LoginActivity extends AppCompatActivity {
                 .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
                     @Override
                     public void onComplete(@NonNull Task<AuthResult> task) {
-                        showLoading(false);
                         if (task.isSuccessful()) {
                             Log.d(TAG, "signInWithCredential:success");
                             FirebaseUser user = mAuth.getCurrentUser();
                             if (user != null) {
-                                Log.d(TAG, "Firebase user created: " + user.getUid());
-                                checkUserInFirestore(user);
+                                Log.d(TAG, "Firebase user authenticated: " + user.getUid());
+                                // Small delay to ensure auth state is propagated
+                                user.reload().addOnCompleteListener(reloadTask -> {
+                                    checkUserInFirestore(user);
+                                });
                             }
                         } else {
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
+                            showLoading(false);
                             Toast.makeText(LoginActivity.this, "Google Authentication Failed: " +
                                             (task.getException() != null ? task.getException().getMessage() : "Unknown error"),
                                     Toast.LENGTH_LONG).show();
@@ -201,7 +204,10 @@ public class LoginActivity extends AppCompatActivity {
                         DocumentSnapshot document = task.getResult();
                         if (document.exists()) {
                             Log.d(TAG, "User found in Firestore");
+                            // Update last login time
+                            updateLastLogin(firebaseUser.getUid());
                             // User exists in Firestore, proceed to main activity
+                            showLoading(false);
                             navigateToMainActivity();
                         } else {
                             Log.d(TAG, "User not found in Firestore, creating user document");
@@ -210,9 +216,20 @@ public class LoginActivity extends AppCompatActivity {
                         }
                     } else {
                         Log.w(TAG, "Error getting user document", task.getException());
-                        Toast.makeText(LoginActivity.this, "Error checking user data: " +
-                                        (task.getException() != null ? task.getException().getMessage() : "Unknown error"),
-                                Toast.LENGTH_SHORT).show();
+                        showLoading(false);
+
+                        // Check if it's a permission denied error
+                        if (task.getException() != null &&
+                                task.getException().getMessage() != null &&
+                                task.getException().getMessage().contains("PERMISSION_DENIED")) {
+                            Toast.makeText(LoginActivity.this,
+                                    "Permission denied. Please check Firestore security rules.",
+                                    Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(LoginActivity.this, "Error checking user data: " +
+                                            (task.getException() != null ? task.getException().getMessage() : "Unknown error"),
+                                    Toast.LENGTH_LONG).show();
+                        }
                     }
                 });
     }
@@ -220,33 +237,64 @@ public class LoginActivity extends AppCompatActivity {
     private void createUserInFirestore(FirebaseUser firebaseUser) {
         Map<String, Object> userData = new HashMap<>();
 
-        userData.put("userId", firebaseUser.getUid());
+        // FIXED: Use "uid" instead of "userId" to match SignupActivity
+        userData.put("uid", firebaseUser.getUid());
         userData.put("fullName", firebaseUser.getDisplayName() != null ? firebaseUser.getDisplayName() : "");
         userData.put("email", firebaseUser.getEmail());
-        userData.put("phone", ""); // Will be filled later
-        userData.put("studentId", ""); // Will be filled later
-        userData.put("signInMethod", "google"); // This login is through Google
+        userData.put("phone", "");
+        userData.put("studentId", "");
+        userData.put("signInMethod", "google");
         userData.put("createdAt", System.currentTimeMillis());
-        userData.put("isVerified", firebaseUser.isEmailVerified());
+        userData.put("lastLogin", System.currentTimeMillis());
+        userData.put("isVerified", true); // Google users are pre-verified
+        userData.put("userType", "student"); // FIXED: Added missing userType field
 
+        // Handle profile image
+        String profileImageUrl = "";
         if (firebaseUser.getPhotoUrl() != null) {
-            userData.put("profileImageUrl", firebaseUser.getPhotoUrl().toString());
+            profileImageUrl = firebaseUser.getPhotoUrl().toString();
+            // Convert to higher resolution image
+            profileImageUrl = profileImageUrl.replace("s96-c", "s400-c");
         }
+        userData.put("profileImageUrl", profileImageUrl);
+
+        Log.d(TAG, "Creating user document with data: " + userData.toString());
 
         db.collection("users").document(firebaseUser.getUid())
                 .set(userData)
                 .addOnSuccessListener(aVoid -> {
                     Log.d(TAG, "User document created successfully");
+                    showLoading(false);
                     Toast.makeText(LoginActivity.this, "Welcome! Profile created successfully.", Toast.LENGTH_SHORT).show();
                     navigateToMainActivity();
                 })
                 .addOnFailureListener(e -> {
                     Log.w(TAG, "Error creating user document", e);
-                    Toast.makeText(LoginActivity.this, "Error creating user profile: " + e.getMessage(),
-                            Toast.LENGTH_SHORT).show();
-                    // Even if Firestore fails, still navigate to main activity
-                    navigateToMainActivity();
+                    showLoading(false);
+
+                    // Check if it's a permission denied error
+                    if (e.getMessage() != null && e.getMessage().contains("PERMISSION_DENIED")) {
+                        Toast.makeText(LoginActivity.this,
+                                "Permission denied. Please check Firestore security rules.",
+                                Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(LoginActivity.this, "Error creating user profile: " + e.getMessage(),
+                                Toast.LENGTH_LONG).show();
+                    }
+
+                    // Sign out user since profile creation failed
+                    mAuth.signOut();
                 });
+    }
+
+    private void updateLastLogin(String userId) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("lastLogin", System.currentTimeMillis());
+
+        db.collection("users").document(userId)
+                .update(updates)
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Last login updated"))
+                .addOnFailureListener(e -> Log.w(TAG, "Failed to update last login", e));
     }
 
     private boolean validateInput(String email, String password) {

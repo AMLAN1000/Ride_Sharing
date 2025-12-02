@@ -92,7 +92,6 @@
                 android:layout_marginEnd="12dp"
                 app:tint="#2196F3" />
 
-            <!-- FIXED: Use compatible TextInputLayout attributes -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -128,7 +127,6 @@
                 android:layout_marginEnd="12dp"
                 app:tint="#2196F3" />
 
-            <!-- FIXED: Use compatible TextInputLayout attributes -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -212,6 +210,17 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/chip_active_filter" />
+
+    <!-- Progress Bar (ADDED) -->
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/subtitle_text" />
 
     <!-- Main Content Area -->
     <androidx.core.widget.NestedScrollView
