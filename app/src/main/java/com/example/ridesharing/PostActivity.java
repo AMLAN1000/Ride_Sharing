@@ -1,88 +1,94 @@
 package com.example.ridesharing;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.Toast;
+import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.cardview.widget.CardView;
-import com.example.ridesharing.BottomNavigationHelper;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 public class PostActivity extends AppCompatActivity {
 
-    private CardView btnOfferRide;
-    private CardView btnRequestRide;
-    private View btnClose;
+    private View btnPostRequest, btnPostRide;
+    private TextView usernameText;
+    private FirebaseAuth mAuth;
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_post);
 
-        // Setup bottom navigation with POST tab selected
-        BottomNavigationHelper.setupBottomNavigation(this, BottomNavigationHelper.NavigationItem.POST);
+        // Initialize Firebase
+        mAuth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
 
-        // Initialize views
         initializeViews();
         setupClickListeners();
+        loadUserData();
+
+        // Setup bottom navigation
+        BottomNavigationHelper.setupBottomNavigation(this, "POST");
     }
 
     private void initializeViews() {
-        btnOfferRide = findViewById(R.id.btn_offer_ride);
-        btnRequestRide = findViewById(R.id.btn_request_ride);
-        btnClose = findViewById(R.id.btn_close);
+        btnPostRequest = findViewById(R.id.btn_post_request);
+        btnPostRide = findViewById(R.id.btn_post_ride);
+        usernameText = findViewById(R.id.username_text);
     }
 
     private void setupClickListeners() {
-        // Offer Ride button click listener
-        btnOfferRide.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Handle offer ride action
-                Toast.makeText(PostActivity.this, "Offer Ride Clicked", Toast.LENGTH_SHORT).show();
-                // TODO: Navigate to OfferRideActivity or show offer ride dialog
-                navigateToOfferRide();
-            }
+        btnPostRequest.setOnClickListener(v -> {
+            // Navigate to PostRequestActivity
+            Intent intent = new Intent(PostActivity.this, PostRequestActivity.class);
+            startActivity(intent);
         });
 
-        // Request Ride button click listener
-        btnRequestRide.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Handle request ride action
-                Toast.makeText(PostActivity.this, "Request Ride Clicked", Toast.LENGTH_SHORT).show();
-                // TODO: Navigate to RequestRideActivity or show request ride dialog
-                navigateToRequestRide();
-            }
-        });
-
-        // Close button click listener
-        btnClose.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Close the activity
-                finish();
-            }
+        btnPostRide.setOnClickListener(v -> {
+            // Navigate to PostRideActivity
+            android.widget.Toast.makeText(this, "Post Ride feature coming soon!", android.widget.Toast.LENGTH_SHORT).show();
         });
     }
 
-    private void navigateToOfferRide() {
-        // TODO: Implement navigation to Offer Ride screen
-        // Example:
-        // Intent intent = new Intent(PostActivity.this, OfferRideActivity.class);
-        // startActivity(intent);
-    }
+    private void loadUserData() {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser != null) {
+            String userId = currentUser.getUid();
+            DocumentReference userRef = db.collection("users").document(userId);
 
-    private void navigateToRequestRide() {
-        // TODO: Implement navigation to Request Ride screen
-        // Example:
-        // Intent intent = new Intent(PostActivity.this, RequestRideActivity.class);
-        // startActivity(intent);
+            userRef.get().addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    DocumentSnapshot document = task.getResult();
+                    if (document.exists()) {
+                        String fullName = document.getString("fullName");
+                        if (fullName != null && !fullName.isEmpty()) {
+                            usernameText.setText(fullName);
+                        } else {
+                            String email = currentUser.getEmail();
+                            usernameText.setText(email != null ? email : "User");
+                        }
+                    } else {
+                        String email = currentUser.getEmail();
+                        usernameText.setText(email != null ? email : "User");
+                    }
+                } else {
+                    String email = currentUser.getEmail();
+                    usernameText.setText(email != null ? email : "User");
+                }
+            });
+        } else {
+            usernameText.setText("Guest");
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        // Ensure POST tab stays selected when returning to this activity
-        BottomNavigationHelper.setupBottomNavigation(this, BottomNavigationHelper.NavigationItem.POST);
+        BottomNavigationHelper.setupBottomNavigation(this, "POST");
+        loadUserData();
     }
 }

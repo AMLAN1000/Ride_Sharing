@@ -63,7 +63,7 @@ public class ProfileActivity extends AppCompatActivity {
         setupClickListeners();
 
         // Setup bottom navigation
-        BottomNavigationHelper.setupBottomNavigation(this, BottomNavigationHelper.NavigationItem.PROFILE);
+        BottomNavigationHelper.setupBottomNavigation(this, "PROFILE");
     }
 
     private void initializeViews() {
