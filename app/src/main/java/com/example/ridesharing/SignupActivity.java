@@ -30,6 +30,7 @@ import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.HashMap;
@@ -274,64 +275,187 @@ public class SignupActivity extends AppCompatActivity {
     }
 
     private void saveUserDataToFirestore(FirebaseUser user, boolean isGoogleSignIn) {
+        // First check if the user document already exists
+        db.collection("users").document(user.getUid()).get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        DocumentSnapshot document = task.getResult();
+                        Map<String, Object> userData = new HashMap<>();
+
+                        if (document.exists()) {
+                            // User already exists - merge data (preserve existing fields)
+                            if (isGoogleSignIn) {
+                                // For Google Sign In, only update fields that Google provides
+                                // and preserve existing data
+                                userData.put("fullName", user.getDisplayName() != null ? user.getDisplayName() :
+                                        document.getString("fullName"));
+                                userData.put("email", user.getEmail());
+
+                                // Save Google profile image URL if available
+                                if (user.getPhotoUrl() != null) {
+                                    String profileImageUrl = user.getPhotoUrl().toString();
+                                    // Convert to higher resolution image
+                                    profileImageUrl = profileImageUrl.replace("s96-c", "s400-c");
+                                    userData.put("profileImageUrl", profileImageUrl);
+                                } else {
+                                    // Preserve existing profile image if no Google image
+                                    if (document.contains("profileImageUrl") && document.getString("profileImageUrl") != null) {
+                                        userData.put("profileImageUrl", document.getString("profileImageUrl"));
+                                    }
+                                }
+
+                                // Preserve existing phone number if it exists
+                                if (document.contains("phone") && document.getString("phone") != null
+                                        && !document.getString("phone").isEmpty()) {
+                                    userData.put("phone", document.getString("phone"));
+                                } else {
+                                    userData.put("phone", ""); // Keep empty if no existing phone
+                                }
+                                // Preserve existing studentId if it exists
+                                if (document.contains("studentId") && document.getString("studentId") != null
+                                        && !document.getString("studentId").isEmpty()) {
+                                    userData.put("studentId", document.getString("studentId"));
+                                } else {
+                                    userData.put("studentId", ""); // Keep empty if no existing studentId
+                                }
+                                userData.put("signInMethod", "google");
+                                userData.put("isVerified", true); // Google users are verified
+                            } else {
+                                // For email/password sign up, use form data (this is a new registration)
+                                userData.put("fullName", etFullName.getText().toString().trim());
+                                userData.put("email", etEmail.getText().toString().trim());
+                                userData.put("phone", etPhone.getText().toString().trim());
+                                userData.put("studentId", etStudentId.getText().toString().trim());
+                                userData.put("profileImageUrl", ""); // Empty for email signup
+                                userData.put("signInMethod", "email");
+                                userData.put("isVerified", user.isEmailVerified());
+                            }
+
+                            // Update timestamp and verification status
+                            userData.put("lastLogin", System.currentTimeMillis());
+
+                            // Use update() instead of set() to preserve existing fields not being modified
+                            db.collection("users").document(user.getUid())
+                                    .update(userData)
+                                    .addOnSuccessListener(aVoid -> {
+                                        Log.d(TAG, "User data updated successfully");
+                                        handleSignUpSuccess(user, isGoogleSignIn);
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.w(TAG, "Error updating user data", e);
+                                        // Even if update fails, still navigate
+                                        handleSignUpSuccess(user, isGoogleSignIn);
+                                    });
+
+                        } else {
+                            // New user - create document with all fields
+                            if (isGoogleSignIn) {
+                                // For Google Sign In
+                                String profileImageUrl = "";
+                                if (user.getPhotoUrl() != null) {
+                                    profileImageUrl = user.getPhotoUrl().toString();
+                                    // Convert to higher resolution image
+                                    profileImageUrl = profileImageUrl.replace("s96-c", "s400-c");
+                                }
+
+                                userData.put("fullName", user.getDisplayName() != null ? user.getDisplayName() : "");
+                                userData.put("email", user.getEmail());
+                                userData.put("phone", ""); // Empty by default
+                                userData.put("studentId", ""); // Empty by default
+                                userData.put("profileImageUrl", profileImageUrl); // Save Google image
+                                userData.put("signInMethod", "google");
+                                userData.put("isVerified", true); // Google users are verified
+                            } else {
+                                // For email/password sign up
+                                userData.put("fullName", etFullName.getText().toString().trim());
+                                userData.put("email", etEmail.getText().toString().trim());
+                                userData.put("phone", etPhone.getText().toString().trim());
+                                userData.put("studentId", etStudentId.getText().toString().trim());
+                                userData.put("profileImageUrl", ""); // Empty for email signup
+                                userData.put("signInMethod", "email");
+                                userData.put("isVerified", user.isEmailVerified());
+                            }
+
+                            userData.put("uid", user.getUid()); // Changed to "uid" to match your User model
+                            userData.put("createdAt", System.currentTimeMillis());
+                            userData.put("userType", "student"); // Add userType
+
+                            db.collection("users").document(user.getUid())
+                                    .set(userData)
+                                    .addOnSuccessListener(aVoid -> {
+                                        Log.d(TAG, "User data saved successfully");
+                                        handleSignUpSuccess(user, isGoogleSignIn);
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.w(TAG, "Error saving user data", e);
+                                        handleSignUpSuccess(user, isGoogleSignIn);
+                                    });
+                        }
+                    } else {
+                        Log.w(TAG, "Error checking user existence", task.getException());
+                        // If we can't check existence, proceed with creating new document
+                        createNewUserDocument(user, isGoogleSignIn);
+                    }
+                });
+    }
+
+    private void createNewUserDocument(FirebaseUser user, boolean isGoogleSignIn) {
         Map<String, Object> userData = new HashMap<>();
 
         if (isGoogleSignIn) {
-            // For Google Sign In, use Google account data
+            // For Google Sign In
+            String profileImageUrl = "";
+            if (user.getPhotoUrl() != null) {
+                profileImageUrl = user.getPhotoUrl().toString();
+                // Convert to higher resolution image
+                profileImageUrl = profileImageUrl.replace("s96-c", "s400-c");
+            }
+
             userData.put("fullName", user.getDisplayName() != null ? user.getDisplayName() : "");
             userData.put("email", user.getEmail());
-            userData.put("phone", ""); // Google doesn't provide phone by default
-            userData.put("studentId", ""); // Will need to be filled later
+            userData.put("phone", "");
+            userData.put("studentId", "");
+            userData.put("profileImageUrl", profileImageUrl); // Save Google image
             userData.put("signInMethod", "google");
+            userData.put("isVerified", true); // Google users are verified
         } else {
-            // For email/password sign up, use form data
+            // For email/password sign up
             userData.put("fullName", etFullName.getText().toString().trim());
             userData.put("email", etEmail.getText().toString().trim());
             userData.put("phone", etPhone.getText().toString().trim());
             userData.put("studentId", etStudentId.getText().toString().trim());
+            userData.put("profileImageUrl", ""); // Empty for email signup
             userData.put("signInMethod", "email");
+            userData.put("isVerified", user.isEmailVerified());
         }
 
-        userData.put("userId", user.getUid());
+        userData.put("uid", user.getUid()); // Changed to "uid" to match your User model
         userData.put("createdAt", System.currentTimeMillis());
-        userData.put("isVerified", user.isEmailVerified());
+        userData.put("userType", "student"); // Add userType
 
         db.collection("users").document(user.getUid())
                 .set(userData)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        Log.d(TAG, "User data saved successfully");
-                        showProgressBar(false);
-
-                        if (isGoogleSignIn) {
-                            Toast.makeText(SignupActivity.this, "Google Sign Up Successful!", Toast.LENGTH_SHORT).show();
-                            // For Google sign up, go directly to MainActivity since they're already signed in
-                            navigateToMainActivity();
-                        } else {
-                            Toast.makeText(SignupActivity.this, "Account created successfully! Please verify your email.", Toast.LENGTH_LONG).show();
-                            // Send email verification for email/password users
-                            sendEmailVerification(user);
-                            // For email sign up, go to LoginActivity to sign in
-                            navigateToLoginActivity();
-                        }
-                    }
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "User data saved successfully");
+                    handleSignUpSuccess(user, isGoogleSignIn);
                 })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.w(TAG, "Error saving user data", e);
-                        showProgressBar(false);
-                        Toast.makeText(SignupActivity.this, "Failed to save user data: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-
-                        // Even if Firestore fails, still navigate appropriately
-                        if (isGoogleSignIn) {
-                            navigateToMainActivity();
-                        } else {
-                            navigateToLoginActivity();
-                        }
-                    }
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "Error saving user data", e);
+                    handleSignUpSuccess(user, isGoogleSignIn);
                 });
+    }
+
+    private void handleSignUpSuccess(FirebaseUser user, boolean isGoogleSignIn) {
+        showProgressBar(false);
+
+        if (isGoogleSignIn) {
+            Toast.makeText(SignupActivity.this, "Google Sign In Successful!", Toast.LENGTH_SHORT).show();
+            navigateToMainActivity();
+        } else {
+            Toast.makeText(SignupActivity.this, "Account created successfully! Please verify your email.", Toast.LENGTH_LONG).show();
+            sendEmailVerification(user);
+            navigateToLoginActivity();
+        }
     }
 
     private void sendEmailVerification(FirebaseUser user) {

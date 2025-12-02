@@ -36,4 +36,8 @@
     <!-- Accent Colors -->
     <color name="accent_teal">#03DAC5</color>
     <color name="ripple_color">#E1F5FE</color>
+
+    <!-- FIXED: Replace color names with hex codes -->
+    <color name="gray">#9E9E9E</color>
+    <color name="blue">#2196F3</color>
 </resources>

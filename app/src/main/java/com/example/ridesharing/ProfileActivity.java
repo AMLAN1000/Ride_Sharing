@@ -63,7 +63,7 @@ public class ProfileActivity extends AppCompatActivity {
         setupClickListeners();
 
         // Setup bottom navigation
-        BottomNavigationHelper.setupBottomNavigation(this, BottomNavigationHelper.NavigationItem.PROFILE);
+        BottomNavigationHelper.setupBottomNavigation(this, "PROFILE");
     }
 
     private void initializeViews() {
@@ -201,6 +201,10 @@ public class ProfileActivity extends AppCompatActivity {
         // Make phone number clickable to edit via dialog
         profilePhone.setOnClickListener(v -> {
             showEditPhoneDialog();
+        });
+        findViewById(R.id.btn_my_requests).setOnClickListener(v -> {
+            Intent intent = new Intent(ProfileActivity.this, MyRequestsActivity.class);
+            startActivity(intent);
         });
     }
 

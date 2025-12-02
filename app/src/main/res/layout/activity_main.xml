@@ -28,16 +28,16 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/greeting_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:alpha="0.8"
                 android:text="Good morning"
                 android:textColor="#424242"
-                android:textSize="16sp"
-                android:alpha="0.8" />
+                android:textSize="16sp" />
 
             <TextView
                 android:id="@+id/username_text"
@@ -86,7 +86,7 @@
         android:layout_height="0dp"
         android:padding="24dp"
         android:paddingTop="18dp"
-        app:layout_constraintBottom_toTopOf="@+id/bottom_navigation_include"
+        app:layout_constraintBottom_toTopOf="@+id/bottom_navigation"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
@@ -318,7 +318,7 @@
     </androidx.core.widget.NestedScrollView>
 
     <include
-        android:id="@+id/bottom_navigation_include"
+        android:id="@+id/bottom_navigation"
         layout="@layout/activity_layout_bottom_navigation"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
