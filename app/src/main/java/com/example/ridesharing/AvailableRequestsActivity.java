@@ -586,25 +586,63 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
 
     private void acceptRideRequest(RideRequest request) {
         String driverId = mAuth.getCurrentUser().getUid();
-        String driverName = mAuth.getCurrentUser().getDisplayName();
+
+        // Removed: String driverName = mAuth.getCurrentUser().getDisplayName();
+        // This is now fetched from Firestore to get 'fullName'.
 
         Toast.makeText(this, "Accepting request...", Toast.LENGTH_SHORT).show();
 
-        db.collection("ride_requests").document(request.getId())
-                .update(
-                        "status", "accepted",
-                        "driverId", driverId,
-                        "driverName", driverName != null ? driverName : "Driver",
-                        "acceptedAt", System.currentTimeMillis()
-                )
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "✓ Request accepted! Contact " + request.getPassengerName(),
-                            Toast.LENGTH_LONG).show();
+        // Get driver's name and phone number from Firestore
+        db.collection("users").document(driverId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    String driverName = "Driver"; // Default value
+                    String driverPhone = "";
+
+                    if (documentSnapshot.exists()) {
+                        // Retrieve the correct full name from the 'users' document
+                        driverName = documentSnapshot.getString("fullName");
+                        if (driverName == null || driverName.trim().isEmpty()) {
+                            // Fallback if fullName is missing in the document
+                            driverName = mAuth.getCurrentUser().getDisplayName();
+                            if (driverName == null || driverName.trim().isEmpty()) {
+                                driverName = "Driver";
+                            }
+                        }
+
+                        // Retrieve phone number
+                        driverPhone = documentSnapshot.getString("phone");
+                        if (driverPhone == null) {
+                            driverPhone = "";
+                        }
+                    } else {
+                        Log.w(TAG, "Driver user document not found for ID: " + driverId);
+                    }
+
+                    // Update ride request with driver info
+                    db.collection("ride_requests").document(request.getId())
+                            .update(
+                                    "status", "accepted",
+                                    "driverId", driverId,
+                                    // Use the retrieved driverName (fullName) here
+                                    "driverName", driverName,
+                                    "driverPhone", driverPhone,
+                                    "acceptedAt", System.currentTimeMillis(),
+                                    "notificationShown", false
+                            )
+                            .addOnSuccessListener(aVoid -> {
+                                Toast.makeText(this, "✅ Request accepted! Contact " +
+                                        request.getPassengerName(), Toast.LENGTH_LONG).show();
+                            })
+                            .addOnFailureListener(e -> {
+                                Toast.makeText(this, "Failed: " + e.getMessage(),
+                                        Toast.LENGTH_SHORT).show();
+                                Log.e(TAG, "Error accepting request", e);
+                            });
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to accept request: " + e.getMessage(),
-                            Toast.LENGTH_SHORT).show();
-                    Log.e(TAG, "Error accepting request", e);
+                    Log.e(TAG, "Error fetching driver info", e);
+                    Toast.makeText(this, "Failed to get driver details.", Toast.LENGTH_SHORT).show();
                 });
     }
 
@@ -653,7 +691,7 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
         if (request.getPickupLat() != null && request.getPickupLng() != null &&
                 request.getDropLat() != null && request.getDropLng() != null) {
             try {
-                // Fixed the URI construction to open Google Maps directions
+                // Corrected the Google Maps directions URI to use the standard 'daddr' and 'saddr' parameters
                 String uri = String.format(Locale.ENGLISH,
                         "http://maps.google.com/maps?saddr=%f,%f&daddr=%f,%f",
                         request.getPickupLat(), request.getPickupLng(),

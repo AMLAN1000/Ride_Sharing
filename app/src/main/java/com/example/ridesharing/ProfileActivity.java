@@ -202,6 +202,10 @@ public class ProfileActivity extends AppCompatActivity {
         profilePhone.setOnClickListener(v -> {
             showEditPhoneDialog();
         });
+        findViewById(R.id.btn_my_requests).setOnClickListener(v -> {
+            Intent intent = new Intent(ProfileActivity.this, MyRequestsActivity.class);
+            startActivity(intent);
+        });
     }
 
     private void showEditPhoneDialog() {

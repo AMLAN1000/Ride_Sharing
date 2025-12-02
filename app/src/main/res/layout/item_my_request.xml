@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/card_my_request"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="4dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PENDING"
+            android:textColor="@android:color/white"
+            app:chipBackgroundColor="@android:color/holo_orange_light" />
+
+        <TextView
+            android:id="@+id/tv_pickup_location"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Pickup Location"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:id="@+id/tv_drop_location"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Drop Location"
+            android:textSize="16sp"
+            android:layout_marginTop="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+
+            <TextView
+                android:id="@+id/tv_fare"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="৳150"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="@android:color/holo_green_dark" />
+
+            <TextView
+                android:id="@+id/tv_vehicle_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CAR • 2 passengers"
+                android:textSize="14sp"
+                android:textColor="@android:color/darker_gray" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_departure_time"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Dec 02, 03:00 PM"
+            android:textSize="14sp"
+            android:layout_marginTop="8dp"
+            android:textColor="@android:color/darker_gray" />
+
+        <LinearLayout
+            android:id="@+id/layout_driver_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#E8F5E9"
+            android:padding="12dp"
+            android:layout_marginTop="12dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_driver_info"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Driver: John Doe\n📞 +880 1234567890"
+                android:textSize="14sp"
+                android:textColor="@android:color/black" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_call_driver"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Call Driver"
+                android:backgroundTint="@android:color/holo_green_dark"
+                android:visibility="gone"
+                android:layout_marginEnd="4dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_cancel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Cancel"
+                android:backgroundTint="@android:color/holo_red_light"
+                android:layout_marginEnd="4dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_view_details"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Details"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>
