@@ -376,9 +376,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         tvTrafficInfo.setText("Traffic: " + trafficLevel);
     }
 
-    // CONTINUATION OF PostRequestActivity.java - PART 2
-// Add these methods to the class from PART 1
-
     private void drawEncodedPolyline(String encodedPolyline) {
         if (mMap == null) return;
 
@@ -662,6 +659,30 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                     db.collection("ride_requests")
                             .add(rideRequest)
                             .addOnSuccessListener(documentReference -> {
+                                // Schedule auto-deletion at departure time
+                                long delay = calendar.getTimeInMillis() - System.currentTimeMillis();
+
+                                // Only schedule if departure time is in the future
+                                if (delay > 0) {
+                                    new android.os.Handler().postDelayed(() -> {
+                                        db.collection("ride_requests")
+                                                .document(documentReference.getId())
+                                                .delete()
+                                                .addOnSuccessListener(aVoid -> {
+                                                    Log.d(TAG, "Auto-deleted expired ride request: " + documentReference.getId());
+                                                })
+                                                .addOnFailureListener(e -> {
+                                                    Log.e(TAG, "Failed to auto-delete ride request: " + e.getMessage());
+                                                });
+                                    }, delay);
+                                } else {
+                                    // If departure time has already passed, delete immediately
+                                    documentReference.delete()
+                                            .addOnSuccessListener(aVoid -> {
+                                                Log.d(TAG, "Deleted past ride request: " + documentReference.getId());
+                                            });
+                                }
+
                                 Toast.makeText(this, "✓ Posted successfully!", Toast.LENGTH_SHORT).show();
                                 clearForm();
 
