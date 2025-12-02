@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/bottom_navigation_layout"
+    android:id="@+id/bottom_nav_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:background="#FFFFFF"
-    android:elevation="8dp"
+    android:elevation="16dp"
     android:paddingTop="8dp"
     android:paddingBottom="8dp">
 
+    <!-- Home Button -->
     <LinearLayout
-        android:id="@+id/btn_home"
+        android:id="@+id/nav_home"
         android:layout_width="0dp"
         android:layout_height="60dp"
         android:layout_weight="1"
@@ -25,22 +26,20 @@
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@android:drawable/ic_menu_revert"
-            app:tint="#2196F3" />
+            android:src="@android:drawable/ic_menu_revert" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Home"
-            android:textColor="#2196F3"
             android:textSize="11sp"
-            android:textStyle="bold"
             android:layout_marginTop="4dp" />
 
     </LinearLayout>
 
+    <!-- Post Button -->
     <LinearLayout
-        android:id="@+id/btn_post"
+        android:id="@+id/nav_post"
         android:layout_width="0dp"
         android:layout_height="60dp"
         android:layout_weight="1"
@@ -54,21 +53,20 @@
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@android:drawable/ic_menu_add"
-            app:tint="#9E9E9E" />
+            android:src="@android:drawable/ic_menu_add" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Post"
-            android:textColor="#9E9E9E"
             android:textSize="11sp"
             android:layout_marginTop="4dp" />
 
     </LinearLayout>
 
+    <!-- My Rides Button -->
     <LinearLayout
-        android:id="@+id/btn_my_rides"
+        android:id="@+id/nav_rides"
         android:layout_width="0dp"
         android:layout_height="60dp"
         android:layout_weight="1"
@@ -82,21 +80,20 @@
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@android:drawable/ic_menu_mylocation"
-            app:tint="#9E9E9E" />
+            android:src="@android:drawable/ic_menu_mylocation" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="My Rides"
-            android:textColor="#9E9E9E"
             android:textSize="11sp"
             android:layout_marginTop="4dp" />
 
     </LinearLayout>
 
+    <!-- Profile Button -->
     <LinearLayout
-        android:id="@+id/btn_profile"
+        android:id="@+id/nav_profile"
         android:layout_width="0dp"
         android:layout_height="60dp"
         android:layout_weight="1"
@@ -110,14 +107,12 @@
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@android:drawable/ic_menu_myplaces"
-            app:tint="#9E9E9E" />
+            android:src="@android:drawable/ic_menu_myplaces" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Profile"
-            android:textColor="#9E9E9E"
             android:textSize="11sp"
             android:layout_marginTop="4dp" />
 

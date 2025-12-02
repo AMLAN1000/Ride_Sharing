@@ -146,7 +146,7 @@
 
     <!-- Bottom Navigation -->
     <include
-        android:id="@+id/bottom_navigation_include"
+        android:id="@+id/bottom_navigation"
         layout="@layout/activity_layout_bottom_navigation"
         android:layout_width="0dp"
         android:layout_height="wrap_content"

@@ -16,7 +16,7 @@ public class MyRidesActivity extends AppCompatActivity {
         setContentView(R.layout.activity_my_rides);
 
         // Setup bottom navigation here
-        BottomNavigationHelper.setupBottomNavigation(this, BottomNavigationHelper.NavigationItem.MY_RIDES);
+        BottomNavigationHelper.setupBottomNavigation(this, "MY_RIDES");
 
         initializeViews();
         setupClickListeners();
@@ -77,6 +77,6 @@ public class MyRidesActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         // Refresh bottom navigation here
-        BottomNavigationHelper.setupBottomNavigation(this, BottomNavigationHelper.NavigationItem.MY_RIDES);
+        BottomNavigationHelper.setupBottomNavigation(this, "MY_RIDES");
     }
 }
