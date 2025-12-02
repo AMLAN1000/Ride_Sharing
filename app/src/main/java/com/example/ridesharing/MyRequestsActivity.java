@@ -35,6 +35,10 @@ public class MyRequestsActivity extends AppCompatActivity {
     private FirebaseAuth mAuth;
     private ListenerRegistration requestsListener;
 
+    private static final String STATUS_PENDING = "pending";
+    private static final String STATUS_ACCEPTED = "accepted";
+    private static final String STATUS_COMPLETED = "completed";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -68,6 +72,7 @@ public class MyRequestsActivity extends AppCompatActivity {
 
             @Override
             public void onCancelRequestClick(MyRideRequest request) {
+                // FIXED: Direct call to showCancelConfirmation which now handles status checks
                 showCancelConfirmation(request);
             }
 
@@ -104,45 +109,40 @@ public class MyRequestsActivity extends AppCompatActivity {
                         return;
                     }
 
-                    if (snapshots == null || snapshots.isEmpty()) {
-                        showEmptyState("You haven't posted any ride requests yet");
-                        return;
-                    }
+                    myRequests.clear();
+                    if (snapshots != null) {
+                        // 1. Process MODIFICATIONS (Notifications for accepted rides)
+                        for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                            if (dc.getType() == DocumentChange.Type.MODIFIED) {
+                                QueryDocumentSnapshot document = dc.getDocument();
+                                String status = document.getString("status");
+                                Boolean notifShown = document.getBoolean("notificationShown");
 
-                    // Check for newly accepted requests
-                    for (DocumentChange dc : snapshots.getDocumentChanges()) {
-                        if (dc.getType() == DocumentChange.Type.MODIFIED) {
-                            QueryDocumentSnapshot document = dc.getDocument();
-                            String status = document.getString("status");
-                            Boolean notifShown = document.getBoolean("notificationShown");
+                                if (STATUS_ACCEPTED.equals(status) &&
+                                        (notifShown == null || !notifShown)) {
 
-                            if ("accepted".equals(status) &&
-                                    (notifShown == null || !notifShown)) {
-
-                                MyRideRequest request = parseMyRideRequest(document);
-                                if (request != null) {
-                                    showAcceptanceDialog(request);
-
-                                    // 🚨 REMOVED RIDE COUNT INCREMENT HERE. It now happens on completion in MyRidesActivity.
-
-                                    document.getReference().update("notificationShown", true);
+                                    MyRideRequest request = parseMyRideRequest(document);
+                                    if (request != null) {
+                                        showAcceptanceDialog(request);
+                                        document.getReference().update("notificationShown", true);
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    myRequests.clear();
-                    for (QueryDocumentSnapshot document : snapshots) {
-                        // Filter out accepted/completed rides, as they should appear in MyRidesActivity now
-                        String status = document.getString("status");
-                        if (!"accepted".equals(status) && !"completed".equals(status)) {
-                            try {
-                                MyRideRequest request = parseMyRideRequest(document);
-                                if (request != null) {
-                                    myRequests.add(request);
+                        // 2. Populate the list (Only show PENDING rides here)
+                        for (QueryDocumentSnapshot document : snapshots) {
+                            String status = document.getString("status");
+                            // Filter: Only show PENDING requests in the MyRequestsActivity
+                            if (STATUS_PENDING.equals(status)) {
+                                try {
+                                    MyRideRequest request = parseMyRideRequest(document);
+                                    if (request != null) {
+                                        myRequests.add(request);
+                                    }
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Error parsing request", e);
                                 }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error parsing request", e);
                             }
                         }
                     }
@@ -156,8 +156,6 @@ public class MyRequestsActivity extends AppCompatActivity {
                     }
                 });
     }
-
-    // ... (rest of the MyRequestsActivity.java code remains the same, except for the now unused incrementRideCount method which should also be removed if it existed)
 
     private MyRideRequest parseMyRideRequest(QueryDocumentSnapshot document) {
         String id = document.getId();
@@ -200,14 +198,16 @@ public class MyRequestsActivity extends AppCompatActivity {
                 .setTitle("✅ Request Accepted!")
                 .setMessage(message)
                 .setPositiveButton("Call Driver", (dialog, which) -> callDriver(request))
-                .setNegativeButton("OK", null)
+                .setNegativeButton("View Accepted Rides (My Rides)", (dialog, which) -> {
+                    // Navigate to MyRidesActivity where accepted rides are shown
+                    startActivity(new Intent(this, MyRidesActivity.class));
+                })
                 .setCancelable(false)
                 .show();
 
         playNotificationSound();
     }
 
-    // ... (rest of the code remains the same)
     private void playNotificationSound() {
         try {
             android.media.RingtoneManager.getRingtone(
@@ -235,15 +235,53 @@ public class MyRequestsActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * FIXED: This method now checks the status and prevents deletion
+     * if the ride is already accepted or completed.
+     */
     private void showCancelConfirmation(MyRideRequest request) {
-        new AlertDialog.Builder(this)
-                .setTitle("Cancel Request?")
-                .setMessage("Are you sure you want to cancel this ride request?")
-                .setPositiveButton("Yes, Cancel", (dialog, which) -> cancelRequest(request))
-                .setNegativeButton("No", null)
-                .show();
+        String status = request.getStatus();
+
+        if (STATUS_PENDING.equals(status)) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Cancel Request?")
+                    .setMessage("Are you sure you want to cancel this ride request?")
+                    .setPositiveButton("Yes, Cancel", (dialog, which) -> cancelRequest(request))
+                    .setNegativeButton("No", null)
+                    .show();
+        } else {
+            // FIX: Prevent deletion for accepted/completed rides.
+            String title;
+            String message;
+
+            if (STATUS_ACCEPTED.equals(status)) {
+                title = "Ride Accepted";
+                message = "This ride has been accepted by " + request.getDriverName() + " and cannot be cancelled here. Please contact the driver to discuss changes.";
+            } else if (STATUS_COMPLETED.equals(status)) {
+                title = "Ride Completed";
+                message = "This ride is marked as completed. It will automatically be removed from your active list soon, but you can view it in the 'My Rides' tab.";
+            } else {
+                title = "Status Check";
+                message = "This request is no longer pending and cannot be cancelled.";
+            }
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setPositiveButton("OK", null);
+
+            // Add an option to call driver if accepted
+            if (STATUS_ACCEPTED.equals(status) && request.getDriverPhone() != null) {
+                builder.setNeutralButton("Call Driver", (dialog, which) -> callDriver(request));
+            }
+
+            builder.show();
+        }
     }
 
+    /**
+     * This method only performs deletion when the ride is still pending (checked in showCancelConfirmation).
+     */
     private void cancelRequest(MyRideRequest request) {
         db.collection("ride_requests")
                 .document(request.getId())
@@ -266,7 +304,7 @@ public class MyRequestsActivity extends AppCompatActivity {
                 request.getVehicleType().toUpperCase() : "CAR") + "\n" +
                 "Passengers: " + request.getPassengers();
 
-        if ("accepted".equals(request.getStatus())) {
+        if (STATUS_ACCEPTED.equals(request.getStatus())) {
             details += "\n\n--- Driver Info ---\n" +
                     "Name: " + request.getDriverName();
             if (request.getDriverPhone() != null) {

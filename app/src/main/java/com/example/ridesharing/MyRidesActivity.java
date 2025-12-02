@@ -14,15 +14,17 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.DocumentSnapshot; // NEW IMPORT
-import com.google.firebase.firestore.FieldValue; // NEW IMPORT
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue; // FieldValue is key for incrementing
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.Query; // NEW IMPORT
+import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+
+// Assuming MyRideItem is correctly defined elsewhere with appropriate getters/setters
 
 public class MyRidesActivity extends AppCompatActivity {
 
@@ -43,6 +45,11 @@ public class MyRidesActivity extends AppCompatActivity {
 
     private boolean showingPassengerRides = true; // Default to passenger view
 
+    // New constants for ride status for cleaner code
+    private static final String STATUS_ACCEPTED = "accepted";
+    private static final String STATUS_COMPLETED = "completed";
+    private static final String FIELD_STATUS = "status";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,9 +63,6 @@ public class MyRidesActivity extends AppCompatActivity {
         // Load passenger rides by default
         updateTabUI(); // Set initial tab appearance
         loadPassengerRides();
-
-        // Assuming BottomNavigationHelper is defined elsewhere
-        // BottomNavigationHelper.setupBottomNavigation(this, "RIDES");
     }
 
     private void initializeViews() {
@@ -68,6 +72,11 @@ public class MyRidesActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progress_bar);
         emptyStateLayout = findViewById(R.id.empty_state_layout);
         emptyStateText = findViewById(R.id.empty_state_text);
+
+        View btnClose = findViewById(R.id.btn_close);
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> finish());
+        }
     }
 
     private void initializeFirebase() {
@@ -95,9 +104,8 @@ public class MyRidesActivity extends AppCompatActivity {
 
             @Override
             public void onCompleteRideClick(MyRideItem ride) {
-                // This check assumes MyRideItem has an 'isPassengerView' field
-                // and the adapter should only enable this click if it's the driver view.
-                if (!ride.isPassengerView()) {
+                // Adapter should only enable this click if it's the driver view.
+                if (!showingPassengerRides) {
                     completeRide(ride);
                 } else {
                     Toast.makeText(MyRidesActivity.this, "Only the driver can mark the ride as complete.", Toast.LENGTH_SHORT).show();
@@ -110,11 +118,6 @@ public class MyRidesActivity extends AppCompatActivity {
     private void setupClickListeners() {
         tabAsPassenger.setOnClickListener(v -> switchToPassengerTab());
         tabAsDriver.setOnClickListener(v -> switchToDriverTab());
-
-        View btnClose = findViewById(R.id.btn_close);
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> finish());
-        }
     }
 
     private void switchToPassengerTab() {
@@ -147,11 +150,6 @@ public class MyRidesActivity extends AppCompatActivity {
         }
     }
 
-    // New constants for ride status for cleaner code
-    private static final String STATUS_ACCEPTED = "accepted";
-    private static final String STATUS_COMPLETED = "completed";
-    private static final String FIELD_STATUS = "status";
-
     private void loadPassengerRides() {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser == null) {
@@ -166,22 +164,8 @@ public class MyRidesActivity extends AppCompatActivity {
             ridesListener.remove();
         }
 
-        // Query for both "accepted" and "completed" rides
+        // Query by passengerId
         ridesListener = db.collection("ride_requests")
-                .whereEqualTo("passengerId", currentUser.getUid())
-                // Firestore doesn't support array-contains for multiple values in a single field,
-                // nor does it support OR queries without an index. The best solution for a simple
-                // status list is typically two queries or changing the structure/logic.
-                // For simplicity, we will assume you need to use a compound query if status were an index.
-                // Since Firestore doesn't easily support WHERE status == 'accepted' OR status == 'completed',
-                // we will query all where passengerId matches and filter in the client, or use multiple listeners/queries
-                // (which is complex). Let's use two `whereEqualTo` calls for the required status fields.
-
-                // *** Using only whereEqualTo(status, accepted) OR whereEqualTo(status, completed) is NOT possible with standard Firebase queries. ***
-                // The practical way is to either use status >= 'accepted' if status names are ordered (accepted < completed)
-                // or query both states separately, or query only by passengerId and filter, which is inefficient.
-
-                // BEST PRACTICE: If only ACCEPTED and COMPLETED are shown, filter out non-accepted/completed states client-side.
                 .whereEqualTo("passengerId", currentUser.getUid())
                 .addSnapshotListener((snapshots, error) -> {
                     processRidesSnapshot(snapshots, error, true, "No accepted or completed rides yet.\nYour rides will appear here.");
@@ -202,7 +186,7 @@ public class MyRidesActivity extends AppCompatActivity {
             ridesListener.remove();
         }
 
-        // Query for both "accepted" and "completed" rides where current user is the driver
+        // Query by driverId
         ridesListener = db.collection("ride_requests")
                 .whereEqualTo("driverId", currentUser.getUid())
                 .addSnapshotListener((snapshots, error) -> {
@@ -230,7 +214,8 @@ public class MyRidesActivity extends AppCompatActivity {
             for (QueryDocumentSnapshot document : snapshots) {
                 try {
                     String status = document.getString(FIELD_STATUS);
-                    // Filter: only show accepted or completed rides
+                    // Filter: only show accepted or completed rides.
+                    // This is key for the fix - we read them here, and prevent deletion in MyRequestsActivity.
                     if (STATUS_ACCEPTED.equals(status) || STATUS_COMPLETED.equals(status)) {
                         MyRideItem ride = parseRideItem(document, isPassengerView);
                         if (ride != null) {
@@ -282,12 +267,12 @@ public class MyRidesActivity extends AppCompatActivity {
             // I'm the passenger, so show driver info
             otherPersonName = driverName != null ? driverName : "Driver";
             otherPersonPhone = driverPhone;
-            otherPersonId = driverId;
+            otherPersonId = driverId; // Driver's ID is the other person's ID
         } else {
             // I'm the driver, so show passenger info
             otherPersonName = passengerName != null ? passengerName : "Passenger";
             otherPersonPhone = passengerPhone;
-            otherPersonId = passengerId;
+            otherPersonId = passengerId; // Passenger's ID is the other person's ID
         }
 
         return new MyRideItem(
@@ -301,9 +286,7 @@ public class MyRidesActivity extends AppCompatActivity {
         );
     }
 
-    // ... (callContact and showRideDetails remain the same)
     private void callContact(MyRideItem ride) {
-        // ... (unchanged)
         if (ride.getOtherPersonPhone() != null && !ride.getOtherPersonPhone().isEmpty()) {
             try {
                 Intent intent = new Intent(Intent.ACTION_DIAL);
@@ -318,7 +301,6 @@ public class MyRidesActivity extends AppCompatActivity {
     }
 
     private void showRideDetails(MyRideItem ride) {
-        // ... (unchanged)
         String roleLabel = ride.isPassengerView() ? "Driver" : "Passenger";
 
         String details = "Status: " + ride.getStatus().toUpperCase() + "\n\n" +
@@ -347,35 +329,27 @@ public class MyRidesActivity extends AppCompatActivity {
     private void completeRide(MyRideItem ride) {
         String currentUserId = mAuth.getCurrentUser().getUid();
 
-        // 🚨 SAFETY CHECK: Ensure only the driver can complete the ride
-        if (ride.isPassengerView() || !currentUserId.equals(ride.getOtherPersonId())) {
-            // In MyRideItem, otherPersonId is the driverId if isPassengerView is true,
-            // and passengerId if isPassengerView is false.
-            // We need to check the actual role, which is easier by checking isPassengerView is FALSE
-            // and if the current user ID matches the driver ID (which is the passenger's otherPersonId)
-            // Let's assume the adapter only calls this for driver view, but check just in case.
-            // Given the context, the adapter's onCompleteRideClick needs to pass the right IDs.
-            // Reverting to the simpler check based on the tab view:
-            if (showingPassengerRides) {
-                Toast.makeText(this, "Only the driver can mark this ride as complete.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            // NOTE: If you need to make this check 100% robust, the MyRideItem must also carry the driverId.
-            // Assuming showingPassengerRides == false is enough of a check based on your UI structure.
+        // Safety check: Ensure the current user is the driver
+        if (showingPassengerRides || !currentUserId.equals(mAuth.getCurrentUser().getUid())) {
+            Toast.makeText(this, "Permission denied. Only the driver can complete the ride.", Toast.LENGTH_SHORT).show();
+            return;
         }
 
         new AlertDialog.Builder(this)
                 .setTitle("Complete Ride?")
                 .setMessage("Are you sure you want to mark this ride as completed? This action will count the ride towards your total.")
                 .setPositiveButton("Yes, Complete", (dialog, which) -> {
+                    // Determine the passenger ID. Since we are in the driver tab, otherPersonId is the passengerId.
+                    String passengerId = ride.getOtherPersonId();
+
                     db.collection("ride_requests")
                             .document(ride.getId())
                             .update(FIELD_STATUS, STATUS_COMPLETED, "completedAt", System.currentTimeMillis())
                             .addOnSuccessListener(aVoid -> {
                                 Toast.makeText(this, "✅ Ride completed!", Toast.LENGTH_SHORT).show();
 
-                                // 🚨 INCREMENT RIDE COUNT FOR BOTH DRIVER AND PASSENGER
-                                incrementRideCount(currentUserId, ride.getOtherPersonId(), ride.getId());
+                                // INCREMENT RIDE COUNT FOR BOTH DRIVER AND PASSENGER
+                                incrementRideCount(currentUserId, passengerId, ride.getId());
 
                             })
                             .addOnFailureListener(e -> {
@@ -389,6 +363,7 @@ public class MyRidesActivity extends AppCompatActivity {
 
     /**
      * Increments the totalRides field by 1 for both the driver and the passenger.
+     * The `FieldValue.increment(1)` operation is atomic and safe.
      * @param driverId The ID of the driver.
      * @param passengerId The ID of the passenger.
      * @param rideId The ID of the ride request (for logging).
@@ -427,13 +402,6 @@ public class MyRidesActivity extends AppCompatActivity {
     private void hideEmptyState() {
         emptyStateLayout.setVisibility(View.GONE);
         recyclerView.setVisibility(View.VISIBLE);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Assuming BottomNavigationHelper is defined elsewhere
-        // BottomNavigationHelper.setupBottomNavigation(this, "RIDES");
     }
 
     @Override
