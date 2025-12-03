@@ -936,7 +936,7 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     private Map<String, Object> createRideRequestData(FirebaseUser currentUser,
                                                       com.google.firebase.firestore.DocumentSnapshot userDoc) {
         Map<String, Object> rideRequest = new HashMap<>();
-
+        rideRequest.put("isDriverPost", false);
         // Passenger info
         rideRequest.put("passengerId", currentUser.getUid());
         rideRequest.put("passengerName", userDoc.exists() ? userDoc.getString("fullName") : "Anonymous");
