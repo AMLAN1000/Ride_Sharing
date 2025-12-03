@@ -64,6 +64,92 @@ public class MyRidesActivity extends AppCompatActivity {
         updateTabUI(); // Set initial tab appearance
         loadPassengerRides();
     }
+    // ✅ ADD THIS ENTIRE METHOD AFTER onCreate()
+    private void listenForDriverRideAcceptance() {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) return;
+
+        String userId = currentUser.getUid();
+
+        // Listen for rides where I'm the driver and status changes to accepted
+        db.collection("ride_requests")
+                .whereEqualTo("driverId", userId)
+                .whereEqualTo("isDriverPost", true)
+                .addSnapshotListener((snapshots, error) -> {
+                    if (error != null) {
+                        Log.e(TAG, "Error listening for driver ride acceptance", error);
+                        return;
+                    }
+
+                    if (snapshots != null) {
+                        for (com.google.firebase.firestore.DocumentChange dc : snapshots.getDocumentChanges()) {
+                            if (dc.getType() == com.google.firebase.firestore.DocumentChange.Type.MODIFIED) {
+                                com.google.firebase.firestore.QueryDocumentSnapshot document = dc.getDocument();
+                                String status = document.getString("status");
+                                Boolean notifShown = document.getBoolean("notificationShown");
+
+                                // Show dialog if just accepted and notification not shown
+                                if ("accepted".equals(status) && (notifShown == null || !notifShown)) {
+                                    showDriverRideAcceptedDialog(document);
+
+                                    // Mark as shown
+                                    document.getReference().update("notificationShown", true);
+                                }
+                            }
+                        }
+                    }
+                });
+    }
+    // ✅ ADD THIS ENTIRE METHOD AFTER listenForDriverRideAcceptance()
+    private void showDriverRideAcceptedDialog(com.google.firebase.firestore.QueryDocumentSnapshot document) {
+        String passengerName = document.getString("passengerName");
+        String passengerPhone = document.getString("passengerPhone");
+        String pickupLocation = document.getString("pickupLocation");
+        String dropLocation = document.getString("dropLocation");
+        Double fare = document.getDouble("fare");
+
+        // Show notification
+        NotificationHelper.showRideAcceptedByPassengerNotification(
+                this,
+                passengerName != null ? passengerName : "Passenger",
+                passengerPhone,
+                pickupLocation != null ? pickupLocation : "Pickup",
+                dropLocation != null ? dropLocation : "Drop",
+                fare != null ? fare : 0.0,
+                document.getId()
+        );
+
+        // Build dialog message
+        String message = "🎉 Great news! " + passengerName +
+                " has accepted your ride offer!\n\n" +
+                "📍 From: " + pickupLocation + "\n" +
+                "🎯 To: " + dropLocation + "\n" +
+                "💰 Fare: ৳" + String.format(java.util.Locale.getDefault(), "%.0f", fare);
+
+        if (passengerPhone != null && !passengerPhone.isEmpty()) {
+            message += "\n\n📞 Passenger Phone: " + passengerPhone;
+        }
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("✅ Ride Offer Accepted!")
+                .setMessage(message)
+                .setPositiveButton("Call Passenger", (dialog, which) -> {
+                    if (passengerPhone != null && !passengerPhone.isEmpty()) {
+                        try {
+                            Intent intent = new Intent(Intent.ACTION_DIAL);
+                            intent.setData(android.net.Uri.parse("tel:" + passengerPhone));
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            Toast.makeText(this, "Unable to open phone dialer", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .setNegativeButton("OK", null)
+                .setCancelable(false)
+                .show();
+
+        NotificationHelper.playNotificationSound(this);
+    }
 
     private void initializeViews() {
         tabAsPassenger = findViewById(R.id.tab_as_passenger);

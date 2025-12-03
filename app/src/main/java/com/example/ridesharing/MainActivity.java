@@ -1,6 +1,8 @@
 package com.example.ridesharing;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -31,23 +33,45 @@ public class MainActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
 
+        // ✅ ADD THESE 3 LINES
+        requestNotificationPermission();
+        NotificationHelper.createNotificationChannel(this);
+        startNotificationService();
+
         initializeViews();
         setupClickListeners();
         loadUserData();
         ExpiredRequestsCleaner.cleanExpiredPendingRequests();
 
-
         testBottomNavigationManually();
 
         // Use string constant
         BottomNavigationHelper.setupBottomNavigation(this, "HOME");
-
-
-        // TEMPORARY DEBUG CODE - Add this in MainActivity.onCreate()
-
-
     }
 
+    // ✅ ADD THIS METHOD
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(
+                        new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+                        100
+                );
+            }
+        }
+    }
+
+    // ✅ ADD THIS METHOD
+    private void startNotificationService() {
+        Intent serviceIntent = new Intent(this, RideListenerService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+        Log.d("MainActivity", "✅ Notification service started");
+    }
 
     private void initializeViews() {
         // Fix: Use the correct IDs from your XML layout
@@ -104,8 +128,6 @@ public class MainActivity extends AppCompatActivity {
             usernameText.setText("Guest");
         }
     }
-
-
 
     private void testBottomNavigationManually() {
         Log.d("TEST", "=== MANUAL BOTTOM NAV TEST ===");

@@ -184,6 +184,15 @@ public class MyRequestsActivity extends AppCompatActivity {
     }
 
     private void showAcceptanceDialog(MyRideRequest request) {
+        NotificationHelper.showRideAcceptedByDriverNotification(
+                this,
+                request.getDriverName(),
+                request.getDriverPhone(),
+                request.getPickupLocation(),
+                request.getDropLocation(),
+                request.getFare(),
+                request.getId()
+        );
         String message = "🎉 Great news! " + request.getDriverName() +
                 " has accepted your ride request!\n\n" +
                 "📍 From: " + request.getPickupLocation() + "\n" +

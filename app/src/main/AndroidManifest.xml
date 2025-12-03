@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="true"
@@ -26,21 +27,28 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCD-k7OlWsemXLHwBXyBoQNO8r9rxRc9nM" />
+
+        <!-- ✅ ADD THIS SERVICE HERE -->
+        <service
+            android:name=".RideListenerService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <activity
             android:name=".PostRequestActivity"
             android:exported="false" />
         <activity
             android:name=".AvailableRequestsActivity"
-            android:exported="false" /> <!-- Keep SplashActivity as Launcher -->
+            android:exported="false" />
         <activity
             android:name=".SplashActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity> <!-- Remove the duplicate AvailableRidesActivity -->
+        </activity>
         <activity
             android:name=".MainActivity"
             android:exported="false" />
