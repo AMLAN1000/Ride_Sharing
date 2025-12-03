@@ -63,6 +63,8 @@ public class MyRidesActivity extends AppCompatActivity {
         // Load passenger rides by default
         updateTabUI(); // Set initial tab appearance
         loadPassengerRides();
+        BottomNavigationHelper.setupBottomNavigation(this, "RIDES");
+
     }
     // ✅ ADD THIS ENTIRE METHOD AFTER onCreate()
     private void listenForDriverRideAcceptance() {
