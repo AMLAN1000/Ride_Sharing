@@ -69,6 +69,8 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
         setupRecyclerView();
         setupSearchFunctionality();
         loadRideRequests();
+        ExpiredRequestsCleaner.cleanExpiredPendingRequests();
+
 
         try {
             BottomNavigationHelper.setupBottomNavigation(this, "HOME");

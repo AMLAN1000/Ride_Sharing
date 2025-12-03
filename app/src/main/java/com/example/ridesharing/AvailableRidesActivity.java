@@ -46,6 +46,8 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
         initializeViews();
         setupRecyclerView();
         loadAvailableRides();
+        ExpiredRequestsCleaner.cleanExpiredPendingRequests();
+
 
         BottomNavigationHelper.setupBottomNavigation(this, "RIDES");
     }

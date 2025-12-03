@@ -34,6 +34,8 @@ public class MainActivity extends AppCompatActivity {
         initializeViews();
         setupClickListeners();
         loadUserData();
+        ExpiredRequestsCleaner.cleanExpiredPendingRequests();
+
 
         testBottomNavigationManually();
 
