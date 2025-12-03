@@ -66,6 +66,9 @@
             android:name=".MyRequestsActivity"
             android:exported="false"
             android:label="My Requests" />
+        <activity
+            android:name=".PostRideActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

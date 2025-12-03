@@ -49,8 +49,8 @@ public class PostActivity extends AppCompatActivity {
         });
 
         btnPostRide.setOnClickListener(v -> {
-            // Navigate to PostRideActivity
-            android.widget.Toast.makeText(this, "Post Ride feature coming soon!", android.widget.Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(PostActivity.this, PostRideActivity.class);
+            startActivity(intent);
         });
     }
 

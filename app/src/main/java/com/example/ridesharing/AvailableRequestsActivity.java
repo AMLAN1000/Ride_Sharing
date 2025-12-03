@@ -264,6 +264,7 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
         // Simple query without orderBy to avoid index issues
         requestsListener = db.collection("ride_requests")
                 .whereEqualTo("status", "pending")
+                .whereEqualTo("isDriverPost", false)
                 .addSnapshotListener((queryDocumentSnapshots, error) -> {
 
                     isLoading = false;
