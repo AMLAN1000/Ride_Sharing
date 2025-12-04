@@ -33,7 +33,7 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
 
     private static final String TAG = "PostRequestActivity";
     private static final String GOOGLE_MAPS_API_KEY = "AIzaSyCD-k7OlWsemXLHwBXyBoQNO8r9rxRc9nM";
-    private static final String OPENWEATHER_API_KEY = "acc6e705fe0c4b7c67e77a98cfc26122"; // Add your key here
+    private static final String OPENWEATHER_API_KEY = "acc6e705fe0c4b7c67e77a98cfc26122";
     private static final String OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather";
 
     // UI Components
@@ -44,7 +44,7 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     private Button btnCheckFare, btnPostRequest, btnDecreasePassengers, btnIncreasePassengers;
     private MaterialCardView cardRoutePreview;
     private LinearLayout layoutTrafficInfo, layoutFareAnalysis, layoutWeatherInfo;
-    private TextView tvFairRange, tvFairnessMessage, tvDetailedReason, tvSuggestion;
+    private TextView tvFairRange, tvFairnessMessage, tvDetailedReason, tvSuggestion, tvPassengerNote;
     private RadioGroup radioGroupVehicleType;
     private RadioButton rbCar, rbBike;
 
@@ -120,6 +120,7 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         btnDecreasePassengers = findViewById(R.id.btn_decrease_passengers);
         btnIncreasePassengers = findViewById(R.id.btn_increase_passengers);
         etSpecialRequest = findViewById(R.id.et_special_request);
+        tvPassengerNote = findViewById(R.id.tv_passenger_note);
 
         // Vehicle type selection
         radioGroupVehicleType = findViewById(R.id.radio_group_vehicle_type);
@@ -235,18 +236,37 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         radioGroupVehicleType.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.rb_car) {
                 vehicleType = "car";
+                // Enable passenger increase up to 6
                 btnIncreasePassengers.setEnabled(true);
+                btnDecreasePassengers.setEnabled(true);
+                // Update passenger note
+                if (tvPassengerNote != null) {
+                    tvPassengerNote.setText("(Max 6 for AC Car)");
+                    tvPassengerNote.setVisibility(View.VISIBLE);
+                }
+                // Reset to minimum 1 passenger
+                if (passengersCount > 6) {
+                    passengersCount = 1;
+                    tvPassengersCount.setText("1");
+                }
             } else if (checkedId == R.id.rb_bike) {
                 vehicleType = "bike";
+                // Force single passenger for bike
                 passengersCount = 1;
                 tvPassengersCount.setText("1");
                 btnIncreasePassengers.setEnabled(false);
+                btnDecreasePassengers.setEnabled(false);
+                // Update passenger note
+                if (tvPassengerNote != null) {
+                    tvPassengerNote.setText("(Only 1 for Bike)");
+                    tvPassengerNote.setVisibility(View.VISIBLE);
+                }
             }
             validateFormCompleteness();
         });
 
         btnDecreasePassengers.setOnClickListener(v -> {
-            if (passengersCount > 1) {
+            if (vehicleType.equals("car") && passengersCount > 1) {
                 passengersCount--;
                 tvPassengersCount.setText(String.valueOf(passengersCount));
                 validateFormCompleteness();
@@ -254,7 +274,7 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         });
 
         btnIncreasePassengers.setOnClickListener(v -> {
-            if (vehicleType.equals("car") && passengersCount < 4) {
+            if (vehicleType.equals("car") && passengersCount < 6) {
                 passengersCount++;
                 tvPassengersCount.setText(String.valueOf(passengersCount));
                 validateFormCompleteness();
@@ -342,7 +362,7 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                         "lat=" + location.latitude +
                         "&lon=" + location.longitude +
                         "&appid=" + OPENWEATHER_API_KEY +
-                        "&units=metric"; // For Celsius temperature
+                        "&units=metric";
 
                 URL url = new URL(urlString);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -362,7 +382,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
             } catch (Exception e) {
                 Log.e(TAG, "Error fetching weather data", e);
                 runOnUiThread(() -> {
-                    // Default weather if API fails
                     currentWeather = "Clear";
                     weatherDescription = "Weather data unavailable";
                     temperature = 25.0;
@@ -377,7 +396,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
 
     private void parseWeatherResponse(JSONObject jsonResponse) {
         try {
-            // Get main weather
             JSONArray weatherArray = jsonResponse.getJSONArray("weather");
             if (weatherArray.length() > 0) {
                 JSONObject weatherObj = weatherArray.getJSONObject(0);
@@ -385,11 +403,9 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                 weatherDescription = weatherObj.getString("description");
             }
 
-            // Get temperature
             JSONObject mainObj = jsonResponse.getJSONObject("main");
             temperature = mainObj.getDouble("temp");
 
-            // Calculate weather multiplier based on conditions
             weatherMultiplier = calculateWeatherMultiplier(currentWeather, temperature);
 
             runOnUiThread(() -> {
@@ -413,29 +429,28 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     private double calculateWeatherMultiplier(String weatherCondition, double temperature) {
         switch (weatherCondition.toLowerCase()) {
             case "thunderstorm":
-                return 1.25; // 25% increase for thunderstorms
+                return 1.10; // Just 10% - safety concern
             case "rain":
             case "drizzle":
-                return 1.2; // 20% increase for rain
+                return 1.08;  // Just 8% - minor inconvenience
             case "snow":
-                return 1.3; // 30% increase for snow
+                return 1.15;  // 15% - rare in Bangladesh but difficult
             case "mist":
             case "fog":
             case "haze":
-                return 1.15; // 15% increase for poor visibility
+                return 1.05;  // Just 5% - visibility issue
             case "clouds":
-                return 1.05; // 5% increase for cloudy
-            case "extreme": // Extreme conditions
-                return 1.4; // 40% increase
+                return 1.02;  // Just 2% - almost normal
+            case "extreme":
+                return 1.12;  // Just 12% - rare extreme
             case "clear":
             default:
-                // Check temperature extremes
                 if (temperature > 35) { // Very hot
-                    return 1.1;
+                    return 1.04; // Just 4% for AC usage
                 } else if (temperature < 10) { // Very cold
-                    return 1.1;
+                    return 1.04; // Just 4% for heating
                 }
-                return 1.0; // Normal weather
+                return 1.0;
         }
     }
 
@@ -450,7 +465,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         tvWeatherInfo.setText(weatherText);
         layoutWeatherInfo.setVisibility(View.VISIBLE);
 
-        // Show weather impact on fare
         if (weatherMultiplier > 1.0) {
             String impactText = String.format(Locale.getDefault(),
                     "Note: Weather increases fare by %.0f%%",
@@ -695,6 +709,7 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         }
 
         calculateFairFare(routeDistance, passengersCount);
+        storeFareBreakdown(0, 0, passengersCount);
 
         final double finalUserFare = userFare;
         runOnUiThread(() -> {
@@ -709,7 +724,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                 disablePostButton();
             }
 
-            // Show distance, traffic and weather info
             String infoText = String.format(Locale.getDefault(),
                     "Distance: %.1f km • Traffic: %s • Weather: %s",
                     routeDistance, getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)),
@@ -725,26 +739,233 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void calculateFairFare(double distance, int passengers) {
-        double baseFare = 60.0;
-        double farePerKm = 15.0;
+        // OFFICIAL BANGLADESH GOVERNMENT RATES for 1500cc AC Taxis
+        double first2KmFare = 85.0;      // First 2 km: ৳85
+        double perKmRate = 34.0;         // Each additional km: ৳34
+        double waitingPer2Min = 8.5;     // Waiting per 2 min
+        double callServiceFee = 20.0;    // Call service fee
 
-        calculatedFairFare = baseFare + (distance * farePerKm);
-        calculatedFairFare *= getTimeMultiplier();
-        calculatedFairFare *= getTrafficMultiplier();
-        calculatedFairFare *= weatherMultiplier; // Apply weather multiplier
-        calculatedFairFare *= getPassengerMultiplier(passengers);
-        calculatedFairFare *= getDistanceMultiplier(distance);
+        // Calculate official AC car fare
+        double officialACFare;
+        if (distance <= 2.0) {
+            officialACFare = first2KmFare;
+        } else {
+            double extraKm = distance - 2.0;
+            double extraFare = extraKm * perKmRate;
+            officialACFare = first2KmFare + extraFare;
+        }
 
-        double trafficFactor = Math.max(1.0, trafficDuration / Math.max(routeDuration, 1.0));
-        calculatedFairFare *= trafficFactor;
+        // Apply minimum charge
+        double officialMinimum = 85.0;
+        officialACFare = Math.max(officialACFare, officialMinimum);
 
-        double range = Math.max(50, calculatedFairFare * 0.2);
-        minFairFare = Math.max(calculatedFairFare - range, baseFare);
-        maxFairFare = calculatedFairFare + range;
+        // Add waiting time charges - Use only EXTRA traffic time
+        double estimatedWaitingMinutes = Math.max(0, (trafficDuration - routeDuration) * 0.7); // Only count 70% of extra time
+        if (estimatedWaitingMinutes > 5) { // Only charge if more than 5 minutes
+            double waitingCharges = Math.ceil(estimatedWaitingMinutes / 3.0) * 8.5; // Per 3 min (was 2 min)
+            officialACFare += waitingCharges;
+        }
 
-        minFairFare = Math.round(minFairFare / 10) * 10;
-        maxFairFare = Math.round(maxFairFare / 10) * 10;
-        calculatedFairFare = Math.round(calculatedFairFare / 10) * 10;
+        // Add call service fee
+        officialACFare += callServiceFee;
+
+        // VEHICLE-SPECIFIC CALCULATIONS
+        if (vehicleType.equalsIgnoreCase("car")) {
+            // AC CAR - Based on official rates with fairness adjustments
+            calculatedFairFare = officialACFare;
+
+            // Apply fairness adjustments for AC Car
+            calculatedFairFare *= getACCarTimeMultiplier();
+            calculatedFairFare *= getACCarWeatherMultiplier();
+            calculatedFairFare *= getACCarPassengerMultiplier(passengers);
+
+            // Traffic delay compensation (beyond waiting charges)
+            double trafficDelayFactor = Math.max(1.0, trafficDuration / Math.max(routeDuration, 1.0));
+            if (trafficDelayFactor > 1.3) { // Only if 30%+ extra time
+                calculatedFairFare *= Math.min(trafficDelayFactor, 1.12); // Max 12% extra
+            }
+
+            // Set fair range for AC Car (±10% or ৳40, whichever is higher)
+            double range = Math.max(40, calculatedFairFare * 0.10);
+            minFairFare = Math.max(calculatedFairFare - range, 105.0); // ৳85 + ৳20 minimum
+            maxFairFare = calculatedFairFare + range;
+
+        } else if (vehicleType.equalsIgnoreCase("bike")) {
+            // BIKE - Based on AC car rate with significant discount
+            // Start with 45% of AC car fare (55% cheaper)
+            calculatedFairFare = officialACFare * 0.45;
+
+            // Apply bike-specific adjustments
+            calculatedFairFare *= getBikeTimeMultiplier();
+            calculatedFairFare *= getBikeWeatherMultiplier();
+
+            // Traffic affects bikes less
+            double trafficDelayFactor = Math.max(1.0, trafficDuration / Math.max(routeDuration, 1.0));
+            if (trafficDelayFactor > 1.6) { // Only if 60%+ extra time (was 40%)
+                calculatedFairFare *= Math.min(trafficDelayFactor, 1.05); // Max 5% extra (was 8%)
+            }
+
+            // Set fair range for Bike (±15% or ৳25, whichever is higher)
+            double range = Math.max(25, calculatedFairFare * 0.15);
+            minFairFare = Math.max(calculatedFairFare - range, 60.0); // Bike minimum ৳60
+            maxFairFare = calculatedFairFare + range;
+        }
+
+        // Round to nearest 5 taka
+        minFairFare = Math.round(minFairFare / 5) * 5;
+        maxFairFare = Math.round(maxFairFare / 5) * 5;
+        calculatedFairFare = Math.round(calculatedFairFare / 5) * 5;
+    }
+
+    // AC Car Multipliers
+    private double getACCarTimeMultiplier() {
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+        int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
+
+        // Weekend premium - smaller
+        if (dayOfWeek == Calendar.FRIDAY || dayOfWeek == Calendar.SATURDAY) {
+            return 1.05; // Just 5% on weekends (was 8%)
+        }
+
+        // Peak hours (Dhaka specific) - smaller
+        if ((hour >= 8 && hour <= 10) || (hour >= 17 && hour <= 19)) {
+            return 1.08; // Just 8% during peak hours (was 12%)
+        }
+
+        // Late night (safety/convenience) - smaller
+        if (hour >= 22 || hour <= 6) {
+            return 1.10; // Just 10% for late night (was 15%)
+        }
+
+        return 1.0;
+    }
+
+    private double getACCarWeatherMultiplier() {
+        // Weather affects AC cars less
+        return Math.min(weatherMultiplier, 1.06); // Max 6% for AC cars
+    }
+
+    private double getACCarPassengerMultiplier(int passengers) {
+        // AC Car can take 1-6 passengers - SMALL increases
+        switch (passengers) {
+            case 1: return 1.0;
+            case 2: return 1.05;  // Just 5% for 2 passengers (was 10%)
+            case 3: return 1.08;  // Just 8% for 3 passengers (was 18%)
+            case 4: return 1.10;  // Just 10% for 4 passengers (was 25%)
+            case 5: return 1.12;  // Just 12% for 5 passengers (was 30%)
+            case 6: return 1.15;  // Just 15% for 6 passengers (was 35%)
+            default: return 1.15; // Max 15% increase
+        }
+    }
+
+    // Bike Multipliers
+    private double getBikeTimeMultiplier() {
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+
+        // Bike has reasonable premiums
+        if (hour >= 22 || hour <= 6) {
+            return 1.12; // Just 12% late night (was 20%)
+        }
+
+        if ((hour >= 8 && hour <= 10) || (hour >= 17 && hour <= 19)) {
+            return 1.08; // Just 8% peak hours (was 15%)
+        }
+
+        return 1.0;
+    }
+
+    private double getBikeWeatherMultiplier() {
+        // Weather affects bikes significantly
+        return Math.min(weatherMultiplier, 1.10); // Max 10% for bikes
+    }
+
+    private void storeFareBreakdown(double officialACFare, double waitingMinutes, int passengers) {
+        StringBuilder breakdown = new StringBuilder();
+
+        if (vehicleType.equalsIgnoreCase("car")) {
+            breakdown.append("🚗 AC Car (1500cc) - Official Rate Based\n");
+            breakdown.append("═══════════════════════════════════\n");
+            breakdown.append("Official Bangladesh Government Rates:\n");
+
+            if (routeDistance <= 2.0) {
+                breakdown.append("• First 2 km: ৳85.00\n");
+            } else {
+                breakdown.append("• First 2 km: ৳85.00\n");
+                breakdown.append(String.format("• Additional %.1f km × ৳34/km: ৳%.0f\n",
+                        routeDistance - 2.0, (routeDistance - 2.0) * 34.0));
+            }
+
+            double estimatedWaitingMinutes = Math.max(0, trafficDuration - routeDuration);
+            if (estimatedWaitingMinutes > 0) {
+                breakdown.append(String.format("• Waiting (%.0f min): ৳%.0f\n",
+                        estimatedWaitingMinutes, Math.ceil(estimatedWaitingMinutes / 2.0) * 8.5));
+            }
+
+            breakdown.append("• App booking: ৳20.00\n");
+
+            // Show adjustments
+            breakdown.append("\nFairness Adjustments:\n");
+            double timeMult = getACCarTimeMultiplier();
+            double weatherMult = getACCarWeatherMultiplier();
+            double passengerMult = getACCarPassengerMultiplier(passengers);
+
+            if (timeMult > 1.0) {
+                breakdown.append(String.format("• %s: +%.0f%%\n", getTimeDescription(), (timeMult - 1.0) * 100));
+            }
+            if (weatherMult > 1.0) {
+                breakdown.append(String.format("• %s weather: +%.0f%%\n", currentWeather, (weatherMult - 1.0) * 100));
+            }
+            if (passengerMult > 1.0) {
+                breakdown.append(String.format("• %d passengers: +%.0f%%\n", passengers, (passengerMult - 1.0) * 100));
+            }
+
+        } else {
+            breakdown.append("🏍️ Motorcycle - Fair Market Rate\n");
+            breakdown.append("═══════════════════════════════════\n");
+            breakdown.append("Based on 1500cc AC Car Official Rate:\n");
+            breakdown.append("• Bike discount: 55% (standard market rate)\n");
+
+            // Show bike adjustments
+            breakdown.append("\nBike-Specific Adjustments:\n");
+            double timeMult = getBikeTimeMultiplier();
+            double weatherMult = getBikeWeatherMultiplier();
+
+            if (timeMult > 1.0) {
+                breakdown.append(String.format("• %s: +%.0f%%\n", getTimeDescription(), (timeMult - 1.0) * 100));
+            }
+            if (weatherMult > 1.0) {
+                breakdown.append(String.format("• %s weather: +%.0f%%\n", currentWeather, (weatherMult - 1.0) * 100));
+            }
+
+            breakdown.append("• Single passenger only\n");
+        }
+
+        breakdown.append(String.format("\n✅ Fair Fare Range: ৳%.0f - ৳%.0f", minFairFare, maxFairFare));
+        breakdown.append(String.format("\n💡 Suggested: ৳%.0f", calculatedFairFare));
+
+        runOnUiThread(() -> {
+            tvDetailedReason.setText(breakdown.toString());
+            tvDetailedReason.setVisibility(View.VISIBLE);
+        });
+    }
+
+    private String getTimeDescription() {
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+        int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
+
+        if (dayOfWeek == Calendar.FRIDAY || dayOfWeek == Calendar.SATURDAY) {
+            return "Weekend";
+        }
+
+        if ((hour >= 8 && hour <= 10) || (hour >= 17 && hour <= 19)) {
+            return "Peak hours";
+        }
+
+        if (hour >= 22 || hour <= 6) {
+            return "Late night";
+        }
+
+        return "Normal hours";
     }
 
     private String getFareFairReason(double userFare) {
@@ -753,7 +974,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                 routeDistance, getTimeOfDayDescription(),
                 getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)));
 
-        // Add weather info if it affects fare
         if (weatherMultiplier > 1.0) {
             reason += String.format(Locale.getDefault(),
                     "\n• %s weather (increased fare by %.0f%%)",
@@ -774,7 +994,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                     distance, getTimeOfDayDescription(),
                     getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY)));
 
-            // Add weather info if it affects fare
             if (weatherMultiplier > 1.0) {
                 reason += String.format(Locale.getDefault(),
                         "\n• %s weather (requires %.0f%% increase)",
@@ -793,7 +1012,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         if (userFare < minFairFare) {
             String suggestion = "💡 Consider a higher fare to get better driver matches";
 
-            // Add specific weather note if applicable
             if (weatherMultiplier > 1.0) {
                 suggestion += " (especially in " + currentWeather.toLowerCase() + " weather)";
             }
@@ -848,7 +1066,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         btnPostRequest.setText("Posting...");
         btnPostRequest.setEnabled(false);
 
-        // Get user data from Firestore first
         db.collection("users").document(currentUser.getUid())
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
@@ -857,13 +1074,10 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                     db.collection("ride_requests")
                             .add(rideRequest)
                             .addOnSuccessListener(documentReference -> {
-                                // Schedule auto-deletion at departure time
                                 long delay = calendar.getTimeInMillis() - System.currentTimeMillis();
 
-                                // Only schedule if departure time is in the future
                                 if (delay > 0) {
                                     new android.os.Handler().postDelayed(() -> {
-                                        // ✅ FIX: CHECK STATUS BEFORE DELETING
                                         db.collection("ride_requests")
                                                 .document(documentReference.getId())
                                                 .get()
@@ -871,7 +1085,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                                                     if (documentSnapshot1.exists()) {
                                                         String status = documentSnapshot1.getString("status");
 
-                                                        // Only delete if status is still "pending"
                                                         if ("pending".equals(status)) {
                                                             documentReference.delete()
                                                                     .addOnSuccessListener(aVoid -> {
@@ -890,7 +1103,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                                                 });
                                     }, delay);
                                 } else {
-                                    // If departure time has already passed, check status before deleting
                                     db.collection("ride_requests")
                                             .document(documentReference.getId())
                                             .get()
@@ -898,7 +1110,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                                                 if (documentSnapshot1.exists()) {
                                                     String status = documentSnapshot1.getString("status");
 
-                                                    // Only delete if status is "pending"
                                                     if ("pending".equals(status)) {
                                                         documentReference.delete()
                                                                 .addOnSuccessListener(aVoid -> {
@@ -937,14 +1148,12 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
                                                       com.google.firebase.firestore.DocumentSnapshot userDoc) {
         Map<String, Object> rideRequest = new HashMap<>();
         rideRequest.put("isDriverPost", false);
-        // Passenger info
         rideRequest.put("passengerId", currentUser.getUid());
         rideRequest.put("passengerName", userDoc.exists() ? userDoc.getString("fullName") : "Anonymous");
         rideRequest.put("passengerPhone", userDoc.exists() ? userDoc.getString("phone") : "");
         rideRequest.put("passengerPhoto", userDoc.exists() ? userDoc.getString("profileImageUrl") : "");
-        rideRequest.put("passengerRating", 4.5); // Default, should come from reviews later
+        rideRequest.put("passengerRating", 4.5);
 
-        // Trip details
         rideRequest.put("pickupLocation", pickupAddress);
         rideRequest.put("dropLocation", dropAddress);
         rideRequest.put("pickupLat", pickupLatLng.latitude);
@@ -952,22 +1161,18 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         rideRequest.put("dropLat", dropLatLng.latitude);
         rideRequest.put("dropLng", dropLatLng.longitude);
 
-        // Fare and vehicle
         rideRequest.put("fare", Double.parseDouble(etFare.getText().toString().trim()));
         rideRequest.put("vehicleType", vehicleType);
         rideRequest.put("passengers", passengersCount);
 
-        // Timing
         rideRequest.put("departureTime", calendar.getTimeInMillis());
         rideRequest.put("createdAt", System.currentTimeMillis());
 
-        // Weather info
         rideRequest.put("weatherCondition", currentWeather);
         rideRequest.put("weatherDescription", weatherDescription);
         rideRequest.put("temperature", temperature);
         rideRequest.put("weatherMultiplier", weatherMultiplier);
 
-        // Additional info
         rideRequest.put("specialRequest", etSpecialRequest.getText().toString().trim());
         rideRequest.put("status", "pending");
         rideRequest.put("calculatedFairFare", calculatedFairFare);
@@ -1021,6 +1226,10 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
             routePolyline.remove();
             routePolyline = null;
         }
+        if (tvPassengerNote != null) {
+            tvPassengerNote.setText("");
+            tvPassengerNote.setVisibility(View.GONE);
+        }
 
         cardRoutePreview.setVisibility(View.GONE);
         layoutTrafficInfo.setVisibility(View.GONE);
@@ -1029,7 +1238,6 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         btnPostRequest.setText("Post Request");
         btnCheckFare.setEnabled(false);
 
-        // Reset weather data
         currentWeather = "Clear";
         weatherDescription = "";
         weatherMultiplier = 1.0;
@@ -1062,30 +1270,26 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         return "Light";
     }
 
+    // Old methods (keeping for backward compatibility, but using new ones instead)
     private double getTimeMultiplier() {
-        int hour = calendar.get(Calendar.HOUR_OF_DAY);
-        int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
-        if (dayOfWeek == Calendar.FRIDAY || dayOfWeek == Calendar.SATURDAY) return 1.2;
-        if ((hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 20)) return 1.3;
-        if (hour >= 22 || hour <= 5) return 1.4;
-        return 1.0;
+        return 1.0; // Replaced by getACCarTimeMultiplier() and getBikeTimeMultiplier()
     }
 
     private double getTrafficMultiplier() {
         int hour = calendar.get(Calendar.HOUR_OF_DAY);
-        if ((hour >= 8 && hour <= 9) || (hour >= 17 && hour <= 18)) return 1.25;
-        if ((hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 19)) return 1.15;
+        if ((hour >= 8 && hour <= 9) || (hour >= 17 && hour <= 18))
+            return 1.08; // Just 8% for heavy traffic (was 25%)
+        if ((hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 19))
+            return 1.04; // Just 4% for moderate traffic (was 15%)
         return 1.0;
     }
 
     private double getPassengerMultiplier(int passengers) {
-        return 1.0 + (passengers - 1) * 0.15;
+        return 1.0; // Replaced by getACCarPassengerMultiplier()
     }
 
     private double getDistanceMultiplier(double distance) {
-        if (distance > 20) return 0.9;
-        if (distance > 10) return 0.95;
-        return 1.0;
+        return 1.0; // Not used in new logic
     }
 
     @Override

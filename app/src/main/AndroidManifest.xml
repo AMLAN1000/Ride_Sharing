@@ -23,7 +23,7 @@
         android:theme="@style/Theme.RideSharing"
         tools:ignore="GoogleAppIndexingWarning">
 
-        <!-- Google Maps API Key -->
+         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCD-k7OlWsemXLHwBXyBoQNO8r9rxRc9nM" />
@@ -46,6 +46,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
