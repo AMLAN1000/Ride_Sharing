@@ -13,7 +13,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 
 public class PostActivity extends AppCompatActivity {
 
-    private View btnPostRequest, btnPostRide;
+    private View btnPostRequest, btnPostRide, btn_post_carpool;
     private TextView usernameText;
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
@@ -39,6 +39,7 @@ public class PostActivity extends AppCompatActivity {
         btnPostRequest = findViewById(R.id.btn_post_request);
         btnPostRide = findViewById(R.id.btn_post_ride);
         usernameText = findViewById(R.id.username_text);
+        btn_post_carpool= findViewById(R.id.btn_post_carpool);
     }
 
     private void setupClickListeners() {
@@ -52,6 +53,11 @@ public class PostActivity extends AppCompatActivity {
             Intent intent = new Intent(PostActivity.this, PostRideActivity.class);
             startActivity(intent);
         });
+        btn_post_carpool.setOnClickListener(v -> {
+            Intent intent = new Intent(PostActivity.this, CarpoolPostActivity.class);
+            startActivity(intent);
+        });
+
     }
 
     private void loadUserData() {

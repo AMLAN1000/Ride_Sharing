@@ -12,6 +12,10 @@ public class Ride {
     private String arrivalTime;
     private double fare;
     private String driverId;
+    private String driverPhone; // Add this
+    private double distance; // Add this
+    private boolean isFareFair; // Add this
+    private int maxSeats; // Add this
 
     // Empty constructor (needed for Firebase later)
     public Ride() {
@@ -21,6 +25,15 @@ public class Ride {
     public Ride(String id, String driverName, String vehicleModel, int availableSeats,
                 double rating, String source, String destination,
                 String departureTime, String arrivalTime, double fare, String driverId) {
+        this(id, driverName, vehicleModel, availableSeats, rating, source, destination,
+                departureTime, arrivalTime, fare, driverId, "", 0.0, true, availableSeats);
+    }
+
+    // New constructor with all fields
+    public Ride(String id, String driverName, String vehicleModel, int availableSeats,
+                double rating, String source, String destination,
+                String departureTime, String arrivalTime, double fare, String driverId,
+                String driverPhone, double distance, boolean isFareFair, int maxSeats) {
         this.id = id;
         this.driverName = driverName;
         this.vehicleModel = vehicleModel;
@@ -32,6 +45,10 @@ public class Ride {
         this.arrivalTime = arrivalTime;
         this.fare = fare;
         this.driverId = driverId;
+        this.driverPhone = driverPhone;
+        this.distance = distance;
+        this.isFareFair = isFareFair;
+        this.maxSeats = maxSeats;
     }
 
     // Getters and Setters
@@ -67,4 +84,17 @@ public class Ride {
 
     public String getDriverId() { return driverId; }
     public void setDriverId(String driverId) { this.driverId = driverId; }
+
+    // New getters and setters
+    public String getDriverPhone() { return driverPhone; }
+    public void setDriverPhone(String driverPhone) { this.driverPhone = driverPhone; }
+
+    public double getDistance() { return distance; }
+    public void setDistance(double distance) { this.distance = distance; }
+
+    public boolean isFareFair() { return isFareFair; }
+    public void setFareFair(boolean fareFair) { isFareFair = fareFair; }
+
+    public int getMaxSeats() { return maxSeats; }
+    public void setMaxSeats(int maxSeats) { this.maxSeats = maxSeats; }
 }

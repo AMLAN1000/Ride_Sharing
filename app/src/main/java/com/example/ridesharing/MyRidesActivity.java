@@ -15,16 +15,15 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FieldValue; // FieldValue is key for incrementing
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
-// Assuming MyRideItem is correctly defined elsewhere with appropriate getters/setters
 
 public class MyRidesActivity extends AppCompatActivity {
 
@@ -45,15 +44,22 @@ public class MyRidesActivity extends AppCompatActivity {
 
     private boolean showingPassengerRides = true; // Default to passenger view
 
-    // New constants for ride status for cleaner code
     private static final String STATUS_ACCEPTED = "accepted";
     private static final String STATUS_COMPLETED = "completed";
+    private static final String STATUS_PENDING = "pending";
+    private static final String STATUS_CANCELLED = "cancelled";
     private static final String FIELD_STATUS = "status";
+    private static final String TYPE_CARPOOL = "carpool";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_my_rides);
+
+        Log.d(TAG, "🚗 MyRidesActivity started");
+
+        // 🔥 HANDLE NOTIFICATION INTENTS
+        handleNotificationIntent();
 
         initializeViews();
         initializeFirebase();
@@ -61,96 +67,35 @@ public class MyRidesActivity extends AppCompatActivity {
         setupClickListeners();
 
         // Load passenger rides by default
-        updateTabUI(); // Set initial tab appearance
+        updateTabUI();
         loadPassengerRides();
         BottomNavigationHelper.setupBottomNavigation(this, "RIDES");
-
     }
-    // ✅ ADD THIS ENTIRE METHOD AFTER onCreate()
-    private void listenForDriverRideAcceptance() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) return;
 
-        String userId = currentUser.getUid();
+    /**
+     * Handle notification intents when activity is opened from notification
+     */
+    private void handleNotificationIntent() {
+        boolean openAsPassenger = getIntent().getBooleanExtra("openAsPassenger", false);
+        boolean openAsDriver = getIntent().getBooleanExtra("openAsDriver", false);
+        String rideId = getIntent().getStringExtra("rideId");
 
-        // Listen for rides where I'm the driver and status changes to accepted
-        db.collection("ride_requests")
-                .whereEqualTo("driverId", userId)
-                .whereEqualTo("isDriverPost", true)
-                .addSnapshotListener((snapshots, error) -> {
-                    if (error != null) {
-                        Log.e(TAG, "Error listening for driver ride acceptance", error);
-                        return;
-                    }
+        Log.d(TAG, "📱 Notification intent received - Passenger: " + openAsPassenger +
+                ", Driver: " + openAsDriver + ", RideID: " + rideId);
 
-                    if (snapshots != null) {
-                        for (com.google.firebase.firestore.DocumentChange dc : snapshots.getDocumentChanges()) {
-                            if (dc.getType() == com.google.firebase.firestore.DocumentChange.Type.MODIFIED) {
-                                com.google.firebase.firestore.QueryDocumentSnapshot document = dc.getDocument();
-                                String status = document.getString("status");
-                                Boolean notifShown = document.getBoolean("notificationShown");
-
-                                // Show dialog if just accepted and notification not shown
-                                if ("accepted".equals(status) && (notifShown == null || !notifShown)) {
-                                    showDriverRideAcceptedDialog(document);
-
-                                    // Mark as shown
-                                    document.getReference().update("notificationShown", true);
-                                }
-                            }
-                        }
-                    }
-                });
-    }
-    // ✅ ADD THIS ENTIRE METHOD AFTER listenForDriverRideAcceptance()
-    private void showDriverRideAcceptedDialog(com.google.firebase.firestore.QueryDocumentSnapshot document) {
-        String passengerName = document.getString("passengerName");
-        String passengerPhone = document.getString("passengerPhone");
-        String pickupLocation = document.getString("pickupLocation");
-        String dropLocation = document.getString("dropLocation");
-        Double fare = document.getDouble("fare");
-
-        // Show notification
-        NotificationHelper.showRideAcceptedByPassengerNotification(
-                this,
-                passengerName != null ? passengerName : "Passenger",
-                passengerPhone,
-                pickupLocation != null ? pickupLocation : "Pickup",
-                dropLocation != null ? dropLocation : "Drop",
-                fare != null ? fare : 0.0,
-                document.getId()
-        );
-
-        // Build dialog message
-        String message = "🎉 Great news! " + passengerName +
-                " has accepted your ride offer!\n\n" +
-                "📍 From: " + pickupLocation + "\n" +
-                "🎯 To: " + dropLocation + "\n" +
-                "💰 Fare: ৳" + String.format(java.util.Locale.getDefault(), "%.0f", fare);
-
-        if (passengerPhone != null && !passengerPhone.isEmpty()) {
-            message += "\n\n📞 Passenger Phone: " + passengerPhone;
+        if (openAsPassenger) {
+            showingPassengerRides = true;
+            Toast.makeText(this, "📱 Showing your passenger rides", Toast.LENGTH_SHORT).show();
+        } else if (openAsDriver) {
+            showingPassengerRides = false;
+            Toast.makeText(this, "📱 Showing your driver rides", Toast.LENGTH_SHORT).show();
         }
 
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("✅ Ride Offer Accepted!")
-                .setMessage(message)
-                .setPositiveButton("Call Passenger", (dialog, which) -> {
-                    if (passengerPhone != null && !passengerPhone.isEmpty()) {
-                        try {
-                            Intent intent = new Intent(Intent.ACTION_DIAL);
-                            intent.setData(android.net.Uri.parse("tel:" + passengerPhone));
-                            startActivity(intent);
-                        } catch (Exception e) {
-                            Toast.makeText(this, "Unable to open phone dialer", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                })
-                .setNegativeButton("OK", null)
-                .setCancelable(false)
-                .show();
-
-        NotificationHelper.playNotificationSound(this);
+        if (rideId != null) {
+            Log.d(TAG, "📋 Notification for specific ride: " + rideId);
+            // Store rideId to potentially highlight/show specific ride
+            getIntent().putExtra("highlightRideId", rideId);
+        }
     }
 
     private void initializeViews() {
@@ -192,12 +137,16 @@ public class MyRidesActivity extends AppCompatActivity {
 
             @Override
             public void onCompleteRideClick(MyRideItem ride) {
-                // Adapter should only enable this click if it's the driver view.
                 if (!showingPassengerRides) {
                     completeRide(ride);
                 } else {
                     Toast.makeText(MyRidesActivity.this, "Only the driver can mark the ride as complete.", Toast.LENGTH_SHORT).show();
                 }
+            }
+
+            @Override
+            public void onCancelRideClick(MyRideItem ride) {
+                showCancelRideDialog(ride);
             }
         });
         recyclerView.setAdapter(adapter);
@@ -252,11 +201,55 @@ public class MyRidesActivity extends AppCompatActivity {
             ridesListener.remove();
         }
 
-        // Query by passengerId
+        String currentUserId = currentUser.getUid();
+
+        // Query for rides where user is passenger (regular rides OR part of carpool)
         ridesListener = db.collection("ride_requests")
-                .whereEqualTo("passengerId", currentUser.getUid())
                 .addSnapshotListener((snapshots, error) -> {
-                    processRidesSnapshot(snapshots, error, true, "No accepted or completed rides yet.\nYour rides will appear here.");
+                    hideLoading();
+
+                    if (error != null) {
+                        Log.e(TAG, "Error loading rides", error);
+                        showEmptyState("Error loading your rides");
+                        return;
+                    }
+
+                    ridesList.clear();
+                    if (snapshots != null) {
+                        for (QueryDocumentSnapshot document : snapshots) {
+                            try {
+                                String status = document.getString(FIELD_STATUS);
+                                String type = document.getString("type");
+
+                                // Check if user is passenger
+                                String passengerId = document.getString("passengerId");
+                                List<String> passengerIds = (List<String>) document.get("passengerIds");
+
+                                boolean isRegularPassenger = passengerId != null && passengerId.equals(currentUserId);
+                                boolean isCarpoolPassenger = passengerIds != null && passengerIds.contains(currentUserId);
+
+                                // Show accepted or completed rides where user is passenger
+                                if ((isRegularPassenger || isCarpoolPassenger) &&
+                                        (STATUS_ACCEPTED.equals(status) || STATUS_COMPLETED.equals(status))) {
+
+                                    MyRideItem ride = parseRideItem(document, true, currentUserId);
+                                    if (ride != null) {
+                                        ridesList.add(ride);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error parsing ride", e);
+                            }
+                        }
+                    }
+
+                    adapter.notifyDataSetChanged();
+
+                    if (ridesList.isEmpty()) {
+                        showEmptyState("No accepted or completed rides yet.\nYour rides will appear here.");
+                    } else {
+                        hideEmptyState();
+                    }
                 });
     }
 
@@ -278,100 +271,145 @@ public class MyRidesActivity extends AppCompatActivity {
         ridesListener = db.collection("ride_requests")
                 .whereEqualTo("driverId", currentUser.getUid())
                 .addSnapshotListener((snapshots, error) -> {
-                    processRidesSnapshot(snapshots, error, false, "No accepted or completed rides yet.\nRides you drive will appear here.");
+                    hideLoading();
+
+                    if (error != null) {
+                        Log.e(TAG, "Error loading rides", error);
+                        showEmptyState("Error loading your rides");
+                        return;
+                    }
+
+                    ridesList.clear();
+                    if (snapshots != null) {
+                        for (QueryDocumentSnapshot document : snapshots) {
+                            try {
+                                String status = document.getString(FIELD_STATUS);
+                                // Show accepted, completed, pending, or cancelled rides
+                                if (STATUS_ACCEPTED.equals(status) || STATUS_COMPLETED.equals(status) ||
+                                        STATUS_PENDING.equals(status) || STATUS_CANCELLED.equals(status)) {
+                                    MyRideItem ride = parseRideItem(document, false, null);
+                                    if (ride != null) {
+                                        ridesList.add(ride);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error parsing ride", e);
+                            }
+                        }
+                    }
+
+                    adapter.notifyDataSetChanged();
+
+                    if (ridesList.isEmpty()) {
+                        showEmptyState("No accepted or completed rides yet.\nRides you drive will appear here.");
+                    } else {
+                        hideEmptyState();
+                    }
                 });
     }
 
-    // Unified snapshot processor to handle client-side status filtering
-    private void processRidesSnapshot(
-            com.google.firebase.firestore.QuerySnapshot snapshots,
-            com.google.firebase.firestore.FirebaseFirestoreException error,
-            boolean isPassengerView,
-            String emptyMessage) {
+    private MyRideItem parseRideItem(QueryDocumentSnapshot document, boolean isPassenger, String currentUserId) {
+        try {
+            String id = document.getId();
+            String status = document.getString("status");
+            String type = document.getString("type");
+            String pickupLocation = document.getString("pickupLocation");
+            String dropLocation = document.getString("dropLocation");
+            Double fare = document.getDouble("fare");
+            Double farePerPassenger = document.getDouble("farePerPassenger");
+            String vehicleType = document.getString("vehicleType");
+            Long passengers = document.getLong("passengers");
+            Long maxSeats = document.getLong("maxSeats");
+            Long passengerCount = document.getLong("passengerCount");
+            Long departureTime = document.getLong("departureTime");
+            Long acceptedAt = document.getLong("acceptedAt");
 
-        hideLoading();
+            String passengerId = document.getString("passengerId");
+            String passengerName = document.getString("passengerName");
+            String passengerPhone = document.getString("passengerPhone");
 
-        if (error != null) {
-            Log.e(TAG, "Error loading rides", error);
-            showEmptyState("Error loading your rides");
-            return;
-        }
+            List<String> passengerNames = (List<String>) document.get("passengerNames");
+            List<String> passengerIds = (List<String>) document.get("passengerIds");
 
-        ridesList.clear();
-        if (snapshots != null) {
-            for (QueryDocumentSnapshot document : snapshots) {
-                try {
-                    String status = document.getString(FIELD_STATUS);
-                    // Filter: only show accepted or completed rides.
-                    // This is key for the fix - we read them here, and prevent deletion in MyRequestsActivity.
-                    if (STATUS_ACCEPTED.equals(status) || STATUS_COMPLETED.equals(status)) {
-                        MyRideItem ride = parseRideItem(document, isPassengerView);
-                        if (ride != null) {
-                            ridesList.add(ride);
+            String driverId = document.getString("driverId");
+            String driverName = document.getString("driverName");
+            String driverPhone = document.getString("driverPhone");
+
+            // Determine who the "other person" is based on role
+            String otherPersonName;
+            String otherPersonPhone;
+            String otherPersonId;
+            String allPassengerNames = "";
+
+            if (isPassenger) {
+                // I'm the passenger, so show driver info
+                otherPersonName = driverName != null ? driverName : "Driver";
+                otherPersonPhone = driverPhone != null ? driverPhone : "";
+                otherPersonId = driverId != null ? driverId : "";
+
+                // For carpools, also show other passengers
+                if (TYPE_CARPOOL.equals(type) && passengerNames != null && passengerIds != null) {
+                    StringBuilder passengersBuilder = new StringBuilder();
+                    for (int i = 0; i < passengerNames.size(); i++) {
+                        if (i < passengerIds.size()) {
+                            String pName = passengerNames.get(i);
+                            String pId = passengerIds.get(i);
+                            if (currentUserId != null && !pId.equals(currentUserId)) {
+                                if (passengersBuilder.length() > 0) {
+                                    passengersBuilder.append(", ");
+                                }
+                                passengersBuilder.append(pName);
+                            }
                         }
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error parsing ride", e);
+                    allPassengerNames = passengersBuilder.toString();
+                }
+            } else {
+                // I'm the driver, so show passenger info
+                if (TYPE_CARPOOL.equals(type) && passengerNames != null && !passengerNames.isEmpty()) {
+                    // For carpools, show all passengers
+                    StringBuilder passengersBuilder = new StringBuilder();
+                    for (String name : passengerNames) {
+                        if (passengersBuilder.length() > 0) {
+                            passengersBuilder.append(", ");
+                        }
+                        passengersBuilder.append(name);
+                    }
+                    otherPersonName = passengersBuilder.toString();
+                    otherPersonPhone = passengerNames.get(0); // Show first passenger's name
+                    otherPersonId = passengerIds != null && !passengerIds.isEmpty() ? passengerIds.get(0) : "";
+                } else {
+                    // Regular ride
+                    otherPersonName = passengerName != null ? passengerName : "Passenger";
+                    otherPersonPhone = passengerPhone != null ? passengerPhone : "";
+                    otherPersonId = passengerId != null ? passengerId : "";
                 }
             }
+
+            return new MyRideItem(
+                    id,
+                    status != null ? status : "unknown",
+                    pickupLocation != null ? pickupLocation : "",
+                    dropLocation != null ? dropLocation : "",
+                    fare != null ? fare : 0.0,
+                    vehicleType != null ? vehicleType : "car",
+                    passengers != null ? passengers.intValue() : 1,
+                    departureTime,
+                    acceptedAt,
+                    otherPersonName,
+                    otherPersonPhone,
+                    otherPersonId,
+                    isPassenger,
+                    TYPE_CARPOOL.equals(type),
+                    farePerPassenger != null ? farePerPassenger : 0.0,
+                    maxSeats != null ? maxSeats.intValue() : 1,
+                    passengerCount != null ? passengerCount.intValue() : 0,
+                    allPassengerNames
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing ride item", e);
+            return null;
         }
-
-        adapter.notifyDataSetChanged();
-
-        if (ridesList.isEmpty()) {
-            showEmptyState(emptyMessage);
-        } else {
-            hideEmptyState();
-        }
-    }
-
-
-    private MyRideItem parseRideItem(QueryDocumentSnapshot document, boolean isPassenger) {
-        // ... (Parsing logic remains mostly the same)
-        String id = document.getId();
-        String status = document.getString("status");
-        String pickupLocation = document.getString("pickupLocation");
-        String dropLocation = document.getString("dropLocation");
-        Double fare = document.getDouble("fare");
-        String vehicleType = document.getString("vehicleType");
-        Long passengers = document.getLong("passengers");
-        Long departureTime = document.getLong("departureTime");
-        Long acceptedAt = document.getLong("acceptedAt");
-
-        String passengerId = document.getString("passengerId");
-        String passengerName = document.getString("passengerName");
-        String passengerPhone = document.getString("passengerPhone");
-
-        String driverId = document.getString("driverId");
-        String driverName = document.getString("driverName");
-        String driverPhone = document.getString("driverPhone");
-
-        // Determine who the "other person" is based on role
-        String otherPersonName;
-        String otherPersonPhone;
-        String otherPersonId;
-
-        if (isPassenger) {
-            // I'm the passenger, so show driver info
-            otherPersonName = driverName != null ? driverName : "Driver";
-            otherPersonPhone = driverPhone;
-            otherPersonId = driverId; // Driver's ID is the other person's ID
-        } else {
-            // I'm the driver, so show passenger info
-            otherPersonName = passengerName != null ? passengerName : "Passenger";
-            otherPersonPhone = passengerPhone;
-            otherPersonId = passengerId; // Passenger's ID is the other person's ID
-        }
-
-        return new MyRideItem(
-                id, status, pickupLocation, dropLocation,
-                fare != null ? fare : 0.0,
-                vehicleType,
-                passengers != null ? passengers.intValue() : 1,
-                departureTime, acceptedAt,
-                otherPersonName, otherPersonPhone, otherPersonId,
-                isPassenger // true if viewing as passenger, false if viewing as driver
-        );
     }
 
     private void callContact(MyRideItem ride) {
@@ -390,18 +428,34 @@ public class MyRidesActivity extends AppCompatActivity {
 
     private void showRideDetails(MyRideItem ride) {
         String roleLabel = ride.isPassengerView() ? "Driver" : "Passenger";
+        boolean isCarpool = ride.isCarpool();
 
-        String details = "Status: " + ride.getStatus().toUpperCase() + "\n\n" +
+        String details = "Type: " + (isCarpool ? "CARPOOL" : "REGULAR RIDE") + "\n" +
+                "Status: " + ride.getStatus().toUpperCase() + "\n\n" +
                 "From: " + ride.getPickupLocation() + "\n" +
                 "To: " + ride.getDropLocation() + "\n" +
-                "Fare: ৳" + String.format(Locale.getDefault(), "%.0f", ride.getFare()) + "\n" +
-                "Vehicle: " + (ride.getVehicleType() != null ?
+                "Fare: ৳" + String.format(Locale.getDefault(), "%.0f", ride.getFare()) + "\n";
+
+        if (isCarpool && ride.getFarePerPassenger() > 0) {
+            details += "Per passenger: ৳" + String.format(Locale.getDefault(), "%.0f", ride.getFarePerPassenger()) + "\n";
+            details += "Passengers: " + ride.getPassengerCount() + "/" + ride.getMaxSeats() + "\n";
+        }
+
+        details += "Vehicle: " + (ride.getVehicleType() != null ?
                 ride.getVehicleType().toUpperCase() : "CAR") + "\n" +
-                "Passengers: " + ride.getPassengers() + "\n\n" +
-                "--- " + roleLabel + " Info ---\n" +
+                "Seats: " + ride.getPassengers() + "\n\n";
+
+        if (isCarpool && ride.isPassengerView() && ride.getAllPassengerNames() != null &&
+                !ride.getAllPassengerNames().isEmpty()) {
+            details += "--- Other Passengers ---\n" +
+                    ride.getAllPassengerNames() + "\n\n";
+        }
+
+        details += "--- " + roleLabel + " Info ---\n" +
                 "Name: " + ride.getOtherPersonName();
 
-        if (ride.getOtherPersonPhone() != null && !ride.getOtherPersonPhone().isEmpty()) {
+        if (ride.getOtherPersonPhone() != null && !ride.getOtherPersonPhone().isEmpty() &&
+                !ride.getOtherPersonPhone().equals(ride.getOtherPersonName())) {
             details += "\nPhone: " + ride.getOtherPersonPhone();
         }
 
@@ -413,12 +467,11 @@ public class MyRidesActivity extends AppCompatActivity {
                 .show();
     }
 
-
     private void completeRide(MyRideItem ride) {
         String currentUserId = mAuth.getCurrentUser().getUid();
 
         // Safety check: Ensure the current user is the driver
-        if (showingPassengerRides || !currentUserId.equals(mAuth.getCurrentUser().getUid())) {
+        if (showingPassengerRides) {
             Toast.makeText(this, "Permission denied. Only the driver can complete the ride.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -427,35 +480,119 @@ public class MyRidesActivity extends AppCompatActivity {
                 .setTitle("Complete Ride?")
                 .setMessage("Are you sure you want to mark this ride as completed? This action will count the ride towards your total.")
                 .setPositiveButton("Yes, Complete", (dialog, which) -> {
-                    // Determine the passenger ID. Since we are in the driver tab, otherPersonId is the passengerId.
-                    String passengerId = ride.getOtherPersonId();
-
-                    db.collection("ride_requests")
-                            .document(ride.getId())
-                            .update(FIELD_STATUS, STATUS_COMPLETED, "completedAt", System.currentTimeMillis())
-                            .addOnSuccessListener(aVoid -> {
-                                Toast.makeText(this, "✅ Ride completed!", Toast.LENGTH_SHORT).show();
-
-                                // INCREMENT RIDE COUNT FOR BOTH DRIVER AND PASSENGER
-                                incrementRideCount(currentUserId, passengerId, ride.getId());
-
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Error completing ride", e);
-                                Toast.makeText(this, "Failed to complete ride: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                            });
+                    if (ride.isCarpool()) {
+                        // For carpools, increment ride count for all passengers
+                        completeCarpoolRide(ride, currentUserId);
+                    } else {
+                        // For regular rides
+                        String passengerId = ride.getOtherPersonId();
+                        db.collection("ride_requests")
+                                .document(ride.getId())
+                                .update(FIELD_STATUS, STATUS_COMPLETED, "completedAt", System.currentTimeMillis())
+                                .addOnSuccessListener(aVoid -> {
+                                    Toast.makeText(this, "✅ Ride completed!", Toast.LENGTH_SHORT).show();
+                                    incrementRideCount(currentUserId, passengerId, ride.getId());
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Error completing ride", e);
+                                    Toast.makeText(this, "Failed to complete ride: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                });
+                    }
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    /**
-     * Increments the totalRides field by 1 for both the driver and the passenger.
-     * The `FieldValue.increment(1)` operation is atomic and safe.
-     * @param driverId The ID of the driver.
-     * @param passengerId The ID of the passenger.
-     * @param rideId The ID of the ride request (for logging).
-     */
+    private void completeCarpoolRide(MyRideItem ride, String driverId) {
+        db.collection("ride_requests")
+                .document(ride.getId())
+                .update(FIELD_STATUS, STATUS_COMPLETED, "completedAt", System.currentTimeMillis())
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "✅ Carpool completed!", Toast.LENGTH_SHORT).show();
+
+                    // Increment ride count for driver
+                    db.collection("users").document(driverId)
+                            .update("totalRides", FieldValue.increment(1));
+
+                    // Get passenger IDs and increment their counts
+                    db.collection("ride_requests").document(ride.getId())
+                            .get()
+                            .addOnSuccessListener(document -> {
+                                List<String> passengerIds = (List<String>) document.get("passengerIds");
+                                if (passengerIds != null) {
+                                    for (String passengerId : passengerIds) {
+                                        db.collection("users").document(passengerId)
+                                                .update("totalRides", FieldValue.increment(1));
+                                    }
+                                }
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error completing carpool", e);
+                    Toast.makeText(this, "Failed to complete carpool: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void showCancelRideDialog(MyRideItem ride) {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) return;
+
+        String status = ride.getStatus();
+
+        if (!showingPassengerRides) {
+            // Driver is cancelling
+            if (STATUS_PENDING.equals(status)) {
+                new AlertDialog.Builder(this)
+                        .setTitle("Cancel Ride Offer?")
+                        .setMessage("Are you sure you want to cancel this ride offer?\n\n" +
+                                "Pickup: " + ride.getPickupLocation() + "\n" +
+                                "Drop: " + ride.getDropLocation() + "\n" +
+                                "Fare: ৳" + String.format(Locale.getDefault(), "%.0f", ride.getFare()))
+                        .setPositiveButton("Yes, Cancel", (dialog, which) -> cancelRideOffer(ride))
+                        .setNegativeButton("No", null)
+                        .show();
+            } else if (STATUS_ACCEPTED.equals(status)) {
+                new AlertDialog.Builder(this)
+                        .setTitle("Cancel Accepted Ride?")
+                        .setMessage("This ride has been accepted. Cancelling now may inconvenience passengers.\n\n" +
+                                "Are you sure you want to cancel?")
+                        .setPositiveButton("Yes, Cancel", (dialog, which) -> cancelAcceptedRide(ride))
+                        .setNegativeButton("No", null)
+                        .show();
+            } else if (STATUS_COMPLETED.equals(status) || STATUS_CANCELLED.equals(status)) {
+                Toast.makeText(this, "Cannot cancel a " + status + " ride", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(this, "Only the driver can cancel rides.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void cancelRideOffer(MyRideItem ride) {
+        db.collection("ride_requests")
+                .document(ride.getId())
+                .delete()
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "✅ Ride offer cancelled", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to cancel: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Error cancelling ride offer", e);
+                });
+    }
+
+    private void cancelAcceptedRide(MyRideItem ride) {
+        db.collection("ride_requests")
+                .document(ride.getId())
+                .update(FIELD_STATUS, STATUS_CANCELLED, "cancelledAt", System.currentTimeMillis())
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "✅ Ride cancelled", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to cancel: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Error cancelling accepted ride", e);
+                });
+    }
+
     private void incrementRideCount(String driverId, String passengerId, String rideId) {
         // Increment Driver's totalRides count
         db.collection("users").document(driverId)
@@ -464,12 +601,13 @@ public class MyRidesActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> Log.e(TAG, "Ride " + rideId + ": Failed to increment driver ride count", e));
 
         // Increment Passenger's totalRides count
-        db.collection("users").document(passengerId)
-                .update("totalRides", FieldValue.increment(1))
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "Ride " + rideId + ": Passenger ride count incremented."))
-                .addOnFailureListener(e -> Log.e(TAG, "Ride " + rideId + ": Failed to increment passenger ride count", e));
+        if (passengerId != null && !passengerId.isEmpty()) {
+            db.collection("users").document(passengerId)
+                    .update("totalRides", FieldValue.increment(1))
+                    .addOnSuccessListener(aVoid -> Log.d(TAG, "Ride " + rideId + ": Passenger ride count incremented."))
+                    .addOnFailureListener(e -> Log.e(TAG, "Ride " + rideId + ": Failed to increment passenger ride count", e));
+        }
     }
-
 
     private void showLoading() {
         progressBar.setVisibility(View.VISIBLE);
@@ -492,9 +630,32 @@ public class MyRidesActivity extends AppCompatActivity {
         recyclerView.setVisibility(View.VISIBLE);
     }
 
+    // 🔥 IMPORTANT: Handle notification clicks when activity is already running
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        Log.d(TAG, "📱 onNewIntent called - handling notification click");
+        setIntent(intent);
+        handleNotificationIntent();
+
+        // Refresh the current view
+        if (showingPassengerRides) {
+            loadPassengerRides();
+        } else {
+            loadDriverRides();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.d(TAG, "🔄 MyRidesActivity resumed");
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        Log.d(TAG, "🛑 MyRidesActivity destroyed");
         if (ridesListener != null) {
             ridesListener.remove();
         }

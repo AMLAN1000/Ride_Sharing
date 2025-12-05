@@ -445,6 +445,10 @@ public class SignupActivity extends AppCompatActivity {
                 });
     }
 
+
+// In SignupActivity.java
+// Replace the handleSignUpSuccess and navigateToLoginActivity methods:
+
     private void handleSignUpSuccess(FirebaseUser user, boolean isGoogleSignIn) {
         showProgressBar(false);
 
@@ -452,9 +456,15 @@ public class SignupActivity extends AppCompatActivity {
             Toast.makeText(SignupActivity.this, "Google Sign In Successful!", Toast.LENGTH_SHORT).show();
             navigateToMainActivity();
         } else {
-            Toast.makeText(SignupActivity.this, "Account created successfully! Please verify your email.", Toast.LENGTH_LONG).show();
+            // ✅ FIX: Send verification email but keep user logged in
             sendEmailVerification(user);
-            navigateToLoginActivity();
+            Toast.makeText(SignupActivity.this,
+                    "Account created successfully! A verification email has been sent.",
+                    Toast.LENGTH_LONG).show();
+
+            // ✅ Navigate to MainActivity instead of LoginActivity
+            // User stays logged in
+            navigateToMainActivity();
         }
     }
 
@@ -465,24 +475,14 @@ public class SignupActivity extends AppCompatActivity {
                     public void onComplete(@NonNull Task<Void> task) {
                         if (task.isSuccessful()) {
                             Log.d(TAG, "Verification email sent to " + user.getEmail());
-                            // Don't show Toast here as it might conflict with the success message
                         } else {
                             Log.w(TAG, "Failed to send verification email", task.getException());
+                            Toast.makeText(SignupActivity.this,
+                                    "Note: Couldn't send verification email",
+                                    Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
-    }
-
-    private void navigateToLoginActivity() {
-        // Sign out the user first (for email/password sign up)
-        mAuth.signOut();
-
-        Intent intent = new Intent(SignupActivity.this, LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-        intent.putExtra("registration_success", true);
-        intent.putExtra("user_email", etEmail.getText().toString().trim());
-        startActivity(intent);
-        finish();
     }
 
     private void navigateToMainActivity() {

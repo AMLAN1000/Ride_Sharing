@@ -19,11 +19,29 @@ public class MyRideItem {
     // Role indicator
     private boolean isPassengerView; // true = viewing as passenger, false = viewing as driver
 
+    // New fields for carpool support
+    private boolean isCarpool;
+    private double farePerPassenger;
+    private int maxSeats;
+    private int passengerCount;
+    private String allPassengerNames; // For displaying multiple passengers
+
     public MyRideItem(String id, String status, String pickupLocation, String dropLocation,
                       double fare, String vehicleType, int passengers,
                       Long departureTime, Long acceptedAt,
                       String otherPersonName, String otherPersonPhone, String otherPersonId,
                       boolean isPassengerView) {
+        this(id, status, pickupLocation, dropLocation, fare, vehicleType, passengers,
+                departureTime, acceptedAt, otherPersonName, otherPersonPhone, otherPersonId,
+                isPassengerView, false, 0.0, 1, 0, "");
+    }
+
+    public MyRideItem(String id, String status, String pickupLocation, String dropLocation,
+                      double fare, String vehicleType, int passengers,
+                      Long departureTime, Long acceptedAt,
+                      String otherPersonName, String otherPersonPhone, String otherPersonId,
+                      boolean isPassengerView, boolean isCarpool, double farePerPassenger,
+                      int maxSeats, int passengerCount, String allPassengerNames) {
         this.id = id;
         this.status = status;
         this.pickupLocation = pickupLocation;
@@ -37,6 +55,11 @@ public class MyRideItem {
         this.otherPersonPhone = otherPersonPhone;
         this.otherPersonId = otherPersonId;
         this.isPassengerView = isPassengerView;
+        this.isCarpool = isCarpool;
+        this.farePerPassenger = farePerPassenger;
+        this.maxSeats = maxSeats;
+        this.passengerCount = passengerCount;
+        this.allPassengerNames = allPassengerNames;
     }
 
     // Getters
@@ -53,6 +76,13 @@ public class MyRideItem {
     public String getOtherPersonPhone() { return otherPersonPhone; }
     public String getOtherPersonId() { return otherPersonId; }
     public boolean isPassengerView() { return isPassengerView; }
+
+    // New getters
+    public boolean isCarpool() { return isCarpool; }
+    public double getFarePerPassenger() { return farePerPassenger; }
+    public int getMaxSeats() { return maxSeats; }
+    public int getPassengerCount() { return passengerCount; }
+    public String getAllPassengerNames() { return allPassengerNames; }
 
     // Helper methods
     public String getRoleLabel() {

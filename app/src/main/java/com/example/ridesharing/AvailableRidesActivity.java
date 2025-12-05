@@ -48,7 +48,6 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
         loadAvailableRides();
         ExpiredRequestsCleaner.cleanExpiredPendingRequests();
 
-
         BottomNavigationHelper.setupBottomNavigation(this, "RIDES");
     }
 
@@ -127,7 +126,7 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                     for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
                         try {
                             Ride ride = parseRideFromFirestore(document);
-                            if (ride != null) {
+                            if (ride != null && !"carpool".equals(document.getString("type"))) {
                                 newRides.add(ride);
                                 Log.d(TAG, "Successfully parsed: " + ride.getDriverName());
                             }
@@ -159,6 +158,8 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
             String dropLocation = document.getString("dropLocation");
             Long departureTime = document.getLong("departureTime");
             Double fare = document.getDouble("fare");
+            Double distance = document.getDouble("distance");
+            Boolean isFareFair = document.getBoolean("isFareFair");
 
             // Format departure time
             String departureTimeStr = "Now";
@@ -171,7 +172,7 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                 }
             }
 
-            // Calculate available seats (total passengers the driver can accommodate)
+            // Calculate available seats
             int availableSeats = passengersLong != null ? passengersLong.intValue() : 1;
 
             return new Ride(
@@ -183,9 +184,13 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                     pickupLocation != null ? pickupLocation : "Pickup",
                     dropLocation != null ? dropLocation : "Drop",
                     departureTimeStr,
-                    "", // arrivalTime (can be calculated if needed)
+                    "", // arrivalTime
                     fare != null ? fare : 0.0,
-                    driverId
+                    driverId,
+                    driverPhone != null ? driverPhone : "",
+                    distance != null ? distance : 0.0,
+                    isFareFair != null ? isFareFair : true,
+                    availableSeats
             );
         } catch (Exception e) {
             Log.e(TAG, "Critical error parsing ride", e);
@@ -272,6 +277,52 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                 .show();
     }
 
+    @Override
+    public void onRideCallClick(Ride ride) {
+        callDriver(ride);
+    }
+
+    @Override
+    public void onRideMessageClick(Ride ride) {
+        Toast.makeText(this, "Messaging feature coming soon!", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onProfileViewClick(Ride ride) {
+        String profileInfo = "Name: " + ride.getDriverName() +
+                "\n\nRating: " + String.format(Locale.getDefault(), "%.1f", ride.getRating()) + " ⭐" +
+                "\n\nVehicle: " + ride.getVehicleModel() +
+                "\n\nAvailable Seats: " + ride.getAvailableSeats();
+
+        if (ride.getDriverPhone() != null && !ride.getDriverPhone().isEmpty()) {
+            profileInfo += "\n\n📞 Driver Phone: " + ride.getDriverPhone();
+        }
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Driver Profile")
+                .setMessage(profileInfo)
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Call Driver", (dialog, which) -> callDriver(ride))
+                .show();
+    }
+
+    private void callDriver(Ride ride) {
+        if (ride.getDriverPhone() != null && !ride.getDriverPhone().isEmpty()) {
+            try {
+                Intent intent = new Intent(Intent.ACTION_DIAL);
+                intent.setData(Uri.parse("tel:" + ride.getDriverPhone()));
+                startActivity(intent);
+            } catch (Exception e) {
+                Toast.makeText(this, "Unable to open phone dialer", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(this, "Driver phone number not available", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // In AvailableRidesActivity.java
+// Replace the acceptRide() method with this fixed version:
+
     private void acceptRide(Ride ride) {
         String passengerId = mAuth.getCurrentUser().getUid();
         Toast.makeText(this, "Accepting ride...", Toast.LENGTH_SHORT).show();
@@ -305,11 +356,16 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                                     "passengerName", passengerName,
                                     "passengerPhone", passengerPhone,
                                     "acceptedAt", System.currentTimeMillis(),
-                                    "notificationShown", false
+                                    "notificationShown", false,
+                                    "notificationSentBy", passengerId  // ✅ Track who triggered this
                             )
                             .addOnSuccessListener(aVoid -> {
                                 Toast.makeText(this, "✅ Ride accepted! Contact " +
                                         ride.getDriverName(), Toast.LENGTH_LONG).show();
+
+                                // ❌ DON'T send notification here!
+                                // Let StatusMonitor handle it so only driver device gets it
+                                Log.d(TAG, "✅ Ride accepted, StatusMonitor will notify driver");
                             })
                             .addOnFailureListener(e -> {
                                 Toast.makeText(this, "Failed: " + e.getMessage(),
@@ -321,20 +377,6 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                     Log.e(TAG, "Error fetching passenger info", e);
                     Toast.makeText(this, "Failed to get passenger details.", Toast.LENGTH_SHORT).show();
                 });
-    }
-
-    @Override
-    public void onProfileViewClick(Ride ride) {
-        String profileInfo = "Name: " + ride.getDriverName() +
-                "\n\nRating: " + String.format(Locale.getDefault(), "%.1f", ride.getRating()) + " ⭐" +
-                "\n\nVehicle: " + ride.getVehicleModel() +
-                "\n\nAvailable Seats: " + ride.getAvailableSeats();
-
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Driver Profile")
-                .setMessage(profileInfo)
-                .setPositiveButton("OK", null)
-                .show();
     }
 
     @Override

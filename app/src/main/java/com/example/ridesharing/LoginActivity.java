@@ -114,9 +114,9 @@ public class LoginActivity extends AppCompatActivity {
                             FirebaseUser user = mAuth.getCurrentUser();
                             if (user != null) {
                                 Log.d(TAG, "User logged in: " + user.getUid());
-                                Log.d(TAG, "Email verified: " + user.isEmailVerified());
 
-                                // Check if user exists in Firestore
+                                // ✅ FIX: Allow login even if email not verified
+                                // User has successfully logged in with correct credentials
                                 checkUserInFirestore(user);
                             }
                         } else {
@@ -350,32 +350,66 @@ public class LoginActivity extends AppCompatActivity {
         finish();
     }
 
+    // In LoginActivity.java
+// Replace the onStart() method with this fixed version:
+
     @Override
     public void onStart() {
         super.onStart();
-        // Check if user is signed in and verified
+        // Check if user is signed in
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
             Log.d(TAG, "Current user found: " + currentUser.getUid());
 
-            // Check if user is verified or signed in with Google
-            boolean isGoogleUser = false;
-            if (currentUser.getProviderData() != null) {
-                for (com.google.firebase.auth.UserInfo userInfo : currentUser.getProviderData()) {
-                    if ("google.com".equals(userInfo.getProviderId())) {
-                        isGoogleUser = true;
-                        break;
-                    }
-                }
-            }
+            // Reload user to get latest email verification status
+            currentUser.reload().addOnCompleteListener(reloadTask -> {
+                if (reloadTask.isSuccessful()) {
+                    FirebaseUser refreshedUser = mAuth.getCurrentUser();
+                    if (refreshedUser != null) {
+                        // Check if user is verified or signed in with Google
+                        boolean isGoogleUser = false;
+                        if (refreshedUser.getProviderData() != null) {
+                            for (com.google.firebase.auth.UserInfo userInfo : refreshedUser.getProviderData()) {
+                                if ("google.com".equals(userInfo.getProviderId())) {
+                                    isGoogleUser = true;
+                                    break;
+                                }
+                            }
+                        }
 
-            // Only auto-login if user is verified or is a Google user
-            if (currentUser.isEmailVerified() || isGoogleUser) {
-                checkUserInFirestore(currentUser);
-            } else {
-                Log.d(TAG, "User email not verified, staying on login screen");
-                Toast.makeText(this, "Please verify your email to continue", Toast.LENGTH_SHORT).show();
-            }
+                        // ✅ FIX: Auto-login if verified OR if email verification is not required for email users
+                        // Check Firestore to see if user has completed profile setup
+                        if (refreshedUser.isEmailVerified() || isGoogleUser) {
+                            Log.d(TAG, "User is verified or Google user, auto-login");
+                            checkUserInFirestore(refreshedUser);
+                        } else {
+                            // ✅ NEW: For email users who haven't verified yet, check if they want to stay logged in
+                            // Check if user has logged in successfully before (has Firestore document)
+                            db.collection("users").document(refreshedUser.getUid())
+                                    .get()
+                                    .addOnSuccessListener(documentSnapshot -> {
+                                        if (documentSnapshot.exists()) {
+                                            // User has Firestore document, meaning they've logged in before
+                                            // Allow them to stay logged in even without verification
+                                            Log.d(TAG, "User has logged in before, allowing access");
+                                            checkUserInFirestore(refreshedUser);
+                                        } else {
+                                            // New user who hasn't verified email yet
+                                            Log.d(TAG, "New user, email not verified, staying on login screen");
+                                            Toast.makeText(this, "Please verify your email to continue", Toast.LENGTH_SHORT).show();
+                                        }
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.e(TAG, "Error checking user document", e);
+                                        // On error, allow login anyway (fail open)
+                                        checkUserInFirestore(refreshedUser);
+                                    });
+                        }
+                    }
+                } else {
+                    Log.e(TAG, "Failed to reload user", reloadTask.getException());
+                }
+            });
         }
     }
 }

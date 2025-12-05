@@ -587,11 +587,11 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
                 .show();
     }
 
+    // In AvailableRequestsActivity.java
+// Replace the acceptRideRequest() method with this fixed version:
+
     private void acceptRideRequest(RideRequest request) {
         String driverId = mAuth.getCurrentUser().getUid();
-
-        // Removed: String driverName = mAuth.getCurrentUser().getDisplayName();
-        // This is now fetched from Firestore to get 'fullName'.
 
         Toast.makeText(this, "Accepting request...", Toast.LENGTH_SHORT).show();
 
@@ -603,17 +603,14 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
                     String driverPhone = "";
 
                     if (documentSnapshot.exists()) {
-                        // Retrieve the correct full name from the 'users' document
                         driverName = documentSnapshot.getString("fullName");
                         if (driverName == null || driverName.trim().isEmpty()) {
-                            // Fallback if fullName is missing in the document
                             driverName = mAuth.getCurrentUser().getDisplayName();
                             if (driverName == null || driverName.trim().isEmpty()) {
                                 driverName = "Driver";
                             }
                         }
 
-                        // Retrieve phone number
                         driverPhone = documentSnapshot.getString("phone");
                         if (driverPhone == null) {
                             driverPhone = "";
@@ -627,15 +624,19 @@ public class AvailableRequestsActivity extends AppCompatActivity implements Ride
                             .update(
                                     "status", "accepted",
                                     "driverId", driverId,
-                                    // Use the retrieved driverName (fullName) here
                                     "driverName", driverName,
                                     "driverPhone", driverPhone,
                                     "acceptedAt", System.currentTimeMillis(),
-                                    "notificationShown", false
+                                    "notificationShown", false,
+                                    "notificationSentBy", driverId  // ✅ Track who triggered this change
                             )
                             .addOnSuccessListener(aVoid -> {
                                 Toast.makeText(this, "✅ Request accepted! Contact " +
                                         request.getPassengerName(), Toast.LENGTH_LONG).show();
+
+                                // ❌ DON'T send notification here at all!
+                                // Let StatusMonitor handle it so only passenger device gets it
+                                Log.d(TAG, "✅ Ride accepted, StatusMonitor will notify passenger");
                             })
                             .addOnFailureListener(e -> {
                                 Toast.makeText(this, "Failed: " + e.getMessage(),

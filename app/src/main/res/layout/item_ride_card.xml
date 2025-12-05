@@ -23,37 +23,31 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <ImageView
-                android:id="@+id/driver_avatar"
+            <TextView
+                android:id="@+id/driver_icon"
                 android:layout_width="56dp"
                 android:layout_height="56dp"
-                android:src="@drawable/ic_person_placeholder"
-                android:scaleType="centerCrop" />
+                android:text="👨"
+                android:textSize="32sp"
+                android:gravity="center"
+                android:background="#E3F2FD"
+                android:padding="8dp"
+                android:layout_marginEnd="12dp"/>
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="12dp"
                 android:orientation="vertical">
 
                 <TextView
                     android:id="@+id/driver_name"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Driver Name"
+                    android:text="John Driver"
                     android:textColor="#212121"
                     android:textSize="18sp"
                     android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/vehicle_info"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="CAR • 4 seats available"
-                    android:textColor="#757575"
-                    android:textSize="14sp" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -70,10 +64,11 @@
                         android:textSize="14sp" />
 
                     <TextView
+                        android:id="@+id/tv_ride_type"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
-                        android:text="Driver"
+                        android:text="🚗 Ride"
                         android:textColor="#757575"
                         android:textSize="14sp" />
 
@@ -88,8 +83,7 @@
                 android:padding="8dp"
                 android:src="@android:drawable/ic_dialog_email"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                app:tint="#2196F3"
-                android:visibility="gone" />
+                app:tint="#2196F3" />
 
             <ImageView
                 android:id="@+id/iv_call"
@@ -98,8 +92,7 @@
                 android:padding="8dp"
                 android:src="@android:drawable/ic_menu_call"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                app:tint="#4CAF50"
-                android:visibility="gone" />
+                app:tint="#4CAF50" />
 
         </LinearLayout>
 
@@ -124,101 +117,75 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
 
-                <!-- Pickup Location -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
-                    <ImageView
+                    <TextView
                         android:layout_width="12dp"
                         android:layout_height="12dp"
-                        android:src="@android:drawable/presence_online"
-                        app:tint="#4CAF50" />
+                        android:text="📍"
+                        android:textSize="10sp"/>
 
-                    <LinearLayout
+                    <TextView
+                        android:id="@+id/source_text"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:text="Gulshan 1"
+                        android:textColor="#212121"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
                         android:layout_marginStart="8dp"
-                        android:orientation="vertical">
+                        android:maxLines="2"
+                        android:ellipsize="end" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="From"
-                            android:textColor="#757575"
-                            android:textSize="10sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/source_text"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Pickup Location"
-                            android:textColor="#212121"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:maxLines="2"
-                            android:ellipsize="end" />
-
-                    </LinearLayout>
-
+                    <TextView
+                        android:id="@+id/departure_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="10:30 AM"
+                        android:textColor="#3F51B5"
+                        android:textSize="13sp"
+                        android:textStyle="bold"/>
                 </LinearLayout>
 
-                <!-- Route Arrow -->
-                <ImageView
-                    android:id="@+id/iv_route_arrow"
+                <TextView
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_marginStart="2dp"
                     android:layout_marginTop="4dp"
                     android:layout_marginBottom="4dp"
-                    android:src="@android:drawable/arrow_down_float"
-                    app:tint="#757575" />
+                    android:text="↓"
+                    android:textSize="16sp"
+                    android:textColor="#757575"
+                    android:gravity="center"/>
 
-                <!-- Drop Location -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
-                    <ImageView
+                    <TextView
                         android:layout_width="12dp"
                         android:layout_height="12dp"
-                        android:src="@android:drawable/presence_offline"
-                        app:tint="#F44336" />
+                        android:text="🎯"
+                        android:textSize="10sp"/>
 
-                    <LinearLayout
-                        android:layout_width="0dp"
+                    <TextView
+                        android:id="@+id/destination_text"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
+                        android:text="Motijheel"
+                        android:textColor="#212121"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
                         android:layout_marginStart="8dp"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="To"
-                            android:textColor="#757575"
-                            android:textSize="10sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/destination_text"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Drop Location"
-                            android:textColor="#212121"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:maxLines="2"
-                            android:ellipsize="end" />
-
-                    </LinearLayout>
-
+                        android:maxLines="2"
+                        android:ellipsize="end"/>
                 </LinearLayout>
 
             </LinearLayout>
@@ -228,11 +195,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
-                android:text="-- km"
+                android:text="5.2 km"
                 android:textColor="#757575"
                 android:textSize="14sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                android:textStyle="bold" />
 
         </LinearLayout>
 
@@ -261,7 +227,7 @@
                     android:id="@+id/tv_fare_label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Fare per Person"
+                    android:text="Fare"
                     android:textColor="#757575"
                     android:textSize="12sp" />
 
@@ -289,8 +255,7 @@
                         android:text="Fair"
                         android:textSize="10sp"
                         app:chipMinHeight="24dp"
-                        app:chipBackgroundColor="#4CAF50"
-                        android:visibility="gone" />
+                        app:chipBackgroundColor="#4CAF50" />
 
                 </LinearLayout>
 
@@ -305,34 +270,25 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Departure"
+                    android:text="Seats"
                     android:textColor="#757575"
                     android:textSize="12sp" />
 
                 <TextView
-                    android:id="@+id/departure_time"
+                    android:id="@+id/tv_seats_info"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="10:30 AM"
+                    android:text="4 seats"
                     android:textColor="#212121"
                     android:textSize="16sp"
                     android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/arrival_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="11:15 AM"
-                    android:textColor="#757575"
-                    android:textSize="12sp" />
 
             </LinearLayout>
 
         </LinearLayout>
 
-        <!-- Vehicle Type and Seats -->
+        <!-- Vehicle Type and Passengers -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -349,11 +305,11 @@
                 app:chipMinHeight="32dp" />
 
             <com.google.android.material.chip.Chip
-                android:id="@+id/chip_seats"
+                android:id="@+id/chip_passengers"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:text="4 seats"
+                android:text="4 available"
                 android:textSize="12sp"
                 app:chipBackgroundColor="#9E9E9E"
                 app:chipMinHeight="32dp" />
@@ -373,7 +329,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="8dp"
-                android:text="View Profile"
+                android:text="Details"
                 android:textColor="#2196F3"
                 app:strokeColor="#2196F3"
                 app:strokeWidth="1dp"
@@ -386,7 +342,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="8dp"
-                android:text="Req Ride"
+                android:text="Request Ride"
                 android:textColor="#FFFFFF"
                 app:backgroundTint="#4CAF50"
                 android:textAllCaps="false" />
