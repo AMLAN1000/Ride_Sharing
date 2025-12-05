@@ -127,7 +127,7 @@ public class MyRidesActivity extends AppCompatActivity {
 
             @Override
             public void onMessageClick(MyRideItem ride) {
-                Toast.makeText(MyRidesActivity.this, "Messaging coming soon", Toast.LENGTH_SHORT).show();
+                openChat(ride);
             }
 
             @Override
@@ -298,6 +298,52 @@ public class MyRidesActivity extends AppCompatActivity {
                         }
                     }
 
+                    // Sort rides: accepted (ongoing) first, then completed
+                    ridesList.sort((ride1, ride2) -> {
+                        String status1 = ride1.getStatus();
+                        String status2 = ride2.getStatus();
+
+                        // Accepted rides come first
+                        if ("accepted".equals(status1) && !"accepted".equals(status2)) {
+                            return -1;
+                        } else if (!"accepted".equals(status1) && "accepted".equals(status2)) {
+                            return 1;
+                        }
+
+                        // If both same status, sort by time (newest first)
+                        if (ride1.getAcceptedAt() != null && ride2.getAcceptedAt() != null) {
+                            return ride2.getAcceptedAt().compareTo(ride1.getAcceptedAt());
+                        } else if (ride1.getDepartureTime() != null && ride2.getDepartureTime() != null) {
+                            return ride2.getDepartureTime().compareTo(ride1.getDepartureTime());
+                        }
+
+                        return 0;
+                    });
+
+                    // Sort rides: accepted first, then pending, then completed, then cancelled
+                    ridesList.sort((ride1, ride2) -> {
+                        String status1 = ride1.getStatus();
+                        String status2 = ride2.getStatus();
+
+                        // Priority order: accepted > pending > completed > cancelled
+                        int priority1 = getStatusPriority(status1);
+                        int priority2 = getStatusPriority(status2);
+
+                        if (priority1 != priority2) {
+                            return Integer.compare(priority1, priority2);
+                        }
+
+                        // If both same status, sort by time (newest first)
+                        if (ride1.getAcceptedAt() != null && ride2.getAcceptedAt() != null) {
+                            return ride2.getAcceptedAt().compareTo(ride1.getAcceptedAt());
+                        } else if (ride1.getDepartureTime() != null && ride2.getDepartureTime() != null) {
+                            return ride2.getDepartureTime().compareTo(ride1.getDepartureTime());
+                        }
+
+                        return 0;
+                    });
+
+
                     adapter.notifyDataSetChanged();
 
                     if (ridesList.isEmpty()) {
@@ -412,6 +458,21 @@ public class MyRidesActivity extends AppCompatActivity {
         }
     }
 
+    private void openChat(MyRideItem ride) {
+        // Only allow chat for accepted (ongoing) rides
+        if (!"accepted".equals(ride.getStatus())) {
+            Toast.makeText(this, "Chat is only available for ongoing rides", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Intent intent = new Intent(this, ChatActivity.class);
+        intent.putExtra("rideId", ride.getId());
+        intent.putExtra("otherPersonName", ride.getOtherPersonName());
+        intent.putExtra("otherPersonId", ride.getOtherPersonId()); // ✅ ADD THIS LINE
+        intent.putExtra("pickupLocation", ride.getPickupLocation());
+        intent.putExtra("dropLocation", ride.getDropLocation());
+        startActivity(intent);
+    }
     private void callContact(MyRideItem ride) {
         if (ride.getOtherPersonPhone() != null && !ride.getOtherPersonPhone().isEmpty()) {
             try {
@@ -608,7 +669,20 @@ public class MyRidesActivity extends AppCompatActivity {
                     .addOnFailureListener(e -> Log.e(TAG, "Ride " + rideId + ": Failed to increment passenger ride count", e));
         }
     }
-
+    private int getStatusPriority(String status) {
+        switch (status.toLowerCase()) {
+            case "accepted":
+                return 1; // Highest priority
+            case "pending":
+                return 2;
+            case "completed":
+                return 3;
+            case "cancelled":
+                return 4; // Lowest priority
+            default:
+                return 5;
+        }
+    }
     private void showLoading() {
         progressBar.setVisibility(View.VISIBLE);
         recyclerView.setVisibility(View.GONE);

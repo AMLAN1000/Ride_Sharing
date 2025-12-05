@@ -17,6 +17,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.RideSharing">
+        <activity
+            android:name=".ChatActivity"
+            android:exported="false" />
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"
@@ -27,64 +30,50 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <activity
             android:name=".MainActivity"
             android:exported="false" />
-
         <activity
             android:name=".LoginActivity"
             android:exported="false" />
-
         <activity
             android:name=".SignupActivity"
             android:exported="false" />
-
         <activity
             android:name=".ProfileActivity"
             android:exported="false" />
-
         <activity
             android:name=".AvailableRequestsActivity"
             android:exported="false" />
-
         <activity
             android:name=".AvailableRidesActivity"
             android:exported="false" />
-
         <activity
             android:name=".AvailableCarpoolsActivity"
-            android:exported="false" />
-
-        <!-- 🔥 IMPORTANT: MyRidesActivity for notifications -->
+            android:exported="false" /> <!-- 🔥 IMPORTANT: MyRidesActivity for notifications -->
         <activity
             android:name=".MyRidesActivity"
             android:exported="false"
             android:launchMode="singleTop" />
-
         <activity
             android:name=".PostActivity"
             android:exported="false" />
-
         <activity
             android:name=".PostRideActivity"
             android:exported="false" />
-
         <activity
             android:name=".PostRequestActivity"
             android:exported="false" />
-
         <activity
             android:name=".CarpoolPostActivity"
             android:exported="false" />
-
         <activity
             android:name=".MyRequestsActivity"
             android:exported="false" />
-
     </application>
 
 </manifest>

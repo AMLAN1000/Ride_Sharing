@@ -236,13 +236,15 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
                 btnCancel.setVisibility(showCancelButton ? View.VISIBLE : View.GONE);
                 btnCancel.setText("pending".equals(statusLower) ? "Cancel Offer" : "Cancel Ride");
 
-                // Call and Message buttons - only when there's a valid phone number
+                // Call button - only when there's a valid phone number
                 String phone = ride.getOtherPersonPhone();
                 boolean showCallButton = phone != null && !phone.isEmpty() &&
                         !phone.equals(ride.getOtherPersonName()) &&
                         !phone.matches(".*[a-zA-Z].*");
                 btnCall.setVisibility(showCallButton ? View.VISIBLE : View.GONE);
-                btnMessage.setVisibility(showCallButton ? View.VISIBLE : View.GONE);
+
+                // Message button - show for accepted (ongoing) rides
+                btnMessage.setVisibility("accepted".equals(statusLower) ? View.VISIBLE : View.GONE);
             }
         }
     }
