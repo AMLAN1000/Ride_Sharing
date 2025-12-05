@@ -100,20 +100,18 @@ public class RideStatusMonitor {
             Log.d(TAG, String.format("👤 Current user: %s, Driver: %s, LastUpdatedBy: %s",
                     userId, driverId, lastUpdatedBy));
 
-            // Only notify if someone ELSE made the change
+            // ✅ FIX: Skip notification if I'm the passenger who just joined
             if (lastUpdatedBy != null && lastUpdatedBy.equals(userId)) {
                 Log.d(TAG, "⏭️ Skipping carpool notification - I made this change");
                 return;
             }
 
-            // If I'm the driver, show "seat filled" notification
+            // ✅ FIX: Only notify driver, NEVER notify other passengers
             if (userId.equals(driverId)) {
                 rideNotificationManager.sendCarpoolSeatFilled(document);
                 Log.d(TAG, "✅ Carpool seat filled notification sent to driver");
-            }
-            // If I'm a passenger who already joined, I don't need notification about another passenger joining
-            else {
-                Log.d(TAG, "⏭️ I'm a passenger, no notification needed for another passenger joining");
+            } else {
+                Log.d(TAG, "⏭️ I'm a passenger, no notification needed");
             }
 
         } catch (Exception e) {

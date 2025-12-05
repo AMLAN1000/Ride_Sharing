@@ -411,8 +411,7 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
                                     FIELD_PASSENGER_IDS, com.google.firebase.firestore.FieldValue.arrayUnion(passengerId),
                                     "passengerNames", com.google.firebase.firestore.FieldValue.arrayUnion(passengerName),
                                     FIELD_PASSENGER_COUNT, com.google.firebase.firestore.FieldValue.increment(1),
-                                    "lastUpdatedBy", passengerId,  // Track who made this update
-                                    "lastUpdateTime", System.currentTimeMillis()  // Trigger StatusMonitor
+                                    "lastUpdatedBy", passengerId  // Track who made this update
                             )
                             .addOnSuccessListener(aVoid -> {
                                 Toast.makeText(this, "✅ Joined carpool successfully!", Toast.LENGTH_LONG).show();
