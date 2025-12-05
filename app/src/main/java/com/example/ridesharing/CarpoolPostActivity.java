@@ -601,35 +601,57 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void showDateTimePicker() {
-        DatePickerDialog datePickerDialog = new DatePickerDialog(
-                this,
-                (view, year, month, dayOfMonth) -> {
-                    calendar.set(Calendar.YEAR, year);
-                    calendar.set(Calendar.MONTH, month);
-                    calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
-                    showTimePicker();
-                },
-                calendar.get(Calendar.YEAR),
-                calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)
-        );
-        datePickerDialog.getDatePicker().setMinDate(System.currentTimeMillis() - 1000);
-        datePickerDialog.show();
-    }
+        // Get current time
+        Calendar now = Calendar.getInstance();
 
-    private void showTimePicker() {
+        // Show time picker directly (no date picker needed since max is 1 hour)
         TimePickerDialog timePickerDialog = new TimePickerDialog(
                 this,
                 (view, hourOfDay, minute) -> {
-                    calendar.set(Calendar.HOUR_OF_DAY, hourOfDay);
-                    calendar.set(Calendar.MINUTE, minute);
+                    // Set the selected time
+                    Calendar selectedTime = Calendar.getInstance();
+                    selectedTime.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                    selectedTime.set(Calendar.MINUTE, minute);
+                    selectedTime.set(Calendar.SECOND, 0);
+                    selectedTime.set(Calendar.MILLISECOND, 0);
+
+                    // Get current time + 1 hour max
+                    Calendar maxTime = Calendar.getInstance();
+                    maxTime.add(Calendar.HOUR_OF_DAY, 1);
+
+                    // Validate: Can't be in the past
+                    if (selectedTime.before(now)) {
+                        Toast.makeText(this,
+                                "❌ Departure time cannot be in the past. Please select a future time.",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
+                    // Validate: Can't be more than 1 hour in future
+                    if (selectedTime.after(maxTime)) {
+                        Toast.makeText(this,
+                                "❌ Departure time cannot be more than 1 hour from now. Maximum: " +
+                                        new SimpleDateFormat("hh:mm a", Locale.getDefault()).format(maxTime.getTime()),
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
+                    // Valid time - save it
+                    calendar.setTimeInMillis(selectedTime.getTimeInMillis());
                     updateTimeButton();
                     validateFormCompleteness();
+
+                    Toast.makeText(this,
+                            "✅ Departure time set successfully",
+                            Toast.LENGTH_SHORT).show();
                 },
-                calendar.get(Calendar.HOUR_OF_DAY),
-                calendar.get(Calendar.MINUTE),
-                false
+                now.get(Calendar.HOUR_OF_DAY),
+                now.get(Calendar.MINUTE),
+                false // 12-hour format
         );
+
+        // Set title with instructions
+        timePickerDialog.setTitle("Select Departure Time (Max 1 hour from now)");
         timePickerDialog.show();
     }
 
