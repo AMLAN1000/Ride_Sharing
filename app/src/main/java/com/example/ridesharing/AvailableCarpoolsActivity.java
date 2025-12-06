@@ -3,15 +3,20 @@ package com.example.ridesharing;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -31,15 +36,25 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
 
     private RecyclerView carpoolsRecyclerView;
     private CarpoolAdapter carpoolAdapter;
-    private View emptyStateLayout;
+    private View emptyStateLayout, searchPanel;
     private ProgressBar progressBar;
     private TextView carpoolsCountText, subtitleText;
+    private Chip chipActiveFilter;
+    private TextInputEditText etFromLocation, etToLocation;
+    private ImageView filterButton;
+
     private List<Carpool> carpoolList = new ArrayList<>();
+    private List<Carpool> filteredList = new ArrayList<>();
 
     private FirebaseFirestore db;
     private FirebaseAuth mAuth;
     private ListenerRegistration carpoolsListener;
     private boolean isLoading = false;
+
+    // Search State
+    private boolean isSearchActive = false;
+    private String currentFromFilter = "";
+    private String currentToFilter = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,6 +64,7 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
         initializeFirebase();
         initializeViews();
         setupRecyclerView();
+        setupSearchFunctionality();
         loadAvailableCarpools();
 
         try {
@@ -67,12 +83,16 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
         carpoolsRecyclerView = findViewById(R.id.carpools_recyclerview);
         emptyStateLayout = findViewById(R.id.empty_state_layout);
         progressBar = findViewById(R.id.progress_bar);
+        searchPanel = findViewById(R.id.search_panel);
+        chipActiveFilter = findViewById(R.id.chip_active_filter);
         carpoolsCountText = findViewById(R.id.carpools_count_text);
         subtitleText = findViewById(R.id.subtitle_text);
+        etFromLocation = findViewById(R.id.et_from_location);
+        etToLocation = findViewById(R.id.et_to_location);
+        filterButton = findViewById(R.id.filter_button);
 
-        Button filterButton = findViewById(R.id.filter_button);
         if (filterButton != null) {
-            filterButton.setOnClickListener(v -> showFilterDialog());
+            filterButton.setOnClickListener(v -> toggleSearchPanel());
         }
 
         Button btnBack = findViewById(R.id.btn_back);
@@ -81,11 +101,144 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
         }
     }
 
+    private void setupSearchFunctionality() {
+        View btnConfirmSearch = findViewById(R.id.btn_confirm_search);
+        if (btnConfirmSearch != null) {
+            btnConfirmSearch.setOnClickListener(v -> applySearchFilter());
+        }
+
+        View btnCancelSearch = findViewById(R.id.btn_cancel_search);
+        if (btnCancelSearch != null) {
+            btnCancelSearch.setOnClickListener(v -> cancelSearch());
+        }
+
+        if (chipActiveFilter != null) {
+            chipActiveFilter.setOnCloseIconClickListener(v -> clearSearchFilter());
+        }
+
+        if (etFromLocation != null) {
+            etFromLocation.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (isSearchActive) {
+                        applySearchFilter();
+                    }
+                }
+            });
+        }
+
+        if (etToLocation != null) {
+            etToLocation.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (isSearchActive) {
+                        applySearchFilter();
+                    }
+                }
+            });
+        }
+    }
+
+    private void toggleSearchPanel() {
+        if (searchPanel != null) {
+            if (searchPanel.getVisibility() == View.VISIBLE) {
+                hideSearchPanel();
+            } else {
+                showSearchPanel();
+            }
+        }
+    }
+
+    private void showSearchPanel() {
+        if (searchPanel != null) {
+            searchPanel.setVisibility(View.VISIBLE);
+        }
+        if (etFromLocation != null) {
+            etFromLocation.requestFocus();
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(etFromLocation, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }
+        }
+    }
+
+    private void hideSearchPanel() {
+        if (searchPanel != null) {
+            searchPanel.setVisibility(View.GONE);
+        }
+        if (etFromLocation != null) {
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(etFromLocation.getWindowToken(), 0);
+            }
+        }
+    }
+
+    private void applySearchFilter() {
+        String from = etFromLocation != null ? etFromLocation.getText().toString().trim().toLowerCase(Locale.ROOT) : "";
+        String to = etToLocation != null ? etToLocation.getText().toString().trim().toLowerCase(Locale.ROOT) : "";
+
+        currentFromFilter = from;
+        currentToFilter = to;
+
+        filteredList.clear();
+        for (Carpool carpool : carpoolList) {
+            String pickup = carpool.getPickupLocation();
+            String drop = carpool.getDropLocation();
+
+            boolean matchesFrom = from.isEmpty() || (pickup != null && pickup.toLowerCase(Locale.ROOT).contains(from));
+            boolean matchesTo = to.isEmpty() || (drop != null && drop.toLowerCase(Locale.ROOT).contains(to));
+
+            if (matchesFrom && matchesTo) {
+                filteredList.add(carpool);
+            }
+        }
+
+        isSearchActive = !from.isEmpty() || !to.isEmpty();
+
+        if (isSearchActive && chipActiveFilter != null) {
+            chipActiveFilter.setVisibility(View.VISIBLE);
+            String filterText = "Filter: ";
+            if (!from.isEmpty()) filterText += "From " + from;
+            if (!to.isEmpty()) filterText += (from.isEmpty() ? "To " : " to ") + to;
+            chipActiveFilter.setText(filterText);
+        } else if (chipActiveFilter != null) {
+            chipActiveFilter.setVisibility(View.GONE);
+        }
+
+        updateUIWithFilteredResults();
+        hideSearchPanel();
+    }
+
+    private void cancelSearch() {
+        hideSearchPanel();
+    }
+
+    private void clearSearchFilter() {
+        if (etFromLocation != null) etFromLocation.setText("");
+        if (etToLocation != null) etToLocation.setText("");
+        currentFromFilter = "";
+        currentToFilter = "";
+        isSearchActive = false;
+        if (chipActiveFilter != null) chipActiveFilter.setVisibility(View.GONE);
+        updateUIWithFilteredResults();
+    }
+
     private void setupRecyclerView() {
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         carpoolsRecyclerView.setLayoutManager(layoutManager);
         carpoolsRecyclerView.setHasFixedSize(true);
-        carpoolAdapter = new CarpoolAdapter(carpoolList, this);
+        carpoolAdapter = new CarpoolAdapter(filteredList, this);
         carpoolsRecyclerView.setAdapter(carpoolAdapter);
     }
 
@@ -108,7 +261,6 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
         FirebaseUser currentUser = mAuth.getCurrentUser();
         final String currentUserId = currentUser != null ? currentUser.getUid() : null;
 
-        // Query for carpool posts (type = "carpool", isDriverPost = true, status = pending)
         carpoolsListener = db.collection("ride_requests")
                 .whereEqualTo("type", "carpool")
                 .whereEqualTo("isDriverPost", true)
@@ -143,9 +295,7 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
                         try {
                             Carpool carpool = parseCarpoolFromFirestore(document);
                             if (carpool != null) {
-                                // Check if there are available seats
                                 if (carpool.getAvailableSeats() > 0) {
-                                    // Check if current user has already joined this carpool
                                     if (currentUserId != null) {
                                         List<String> passengerIds = (List<String>) document.get(FIELD_PASSENGER_IDS);
                                         boolean alreadyJoined = passengerIds != null && passengerIds.contains(currentUserId);
@@ -163,7 +313,15 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
                     runOnUiThread(() -> {
                         carpoolList.clear();
                         carpoolList.addAll(newCarpools);
-                        carpoolAdapter.updateCarpools(carpoolList);
+
+                        if (isSearchActive) {
+                            applySearchFilter();
+                        } else {
+                            filteredList.clear();
+                            filteredList.addAll(carpoolList);
+                            carpoolAdapter.updateCarpools(filteredList);
+                        }
+
                         hideLoadingState();
                         updateUIState();
                     });
@@ -188,12 +346,10 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
             Double totalFare = document.getDouble("totalFare");
             Double distance = document.getDouble("distance");
 
-            // If farePerPassenger doesn't exist, calculate it from totalFare and maxSeats
             if (farePerPassenger == null && totalFare != null && maxSeatsLong != null && maxSeatsLong > 0) {
                 farePerPassenger = totalFare / maxSeatsLong;
             }
 
-            // Format departure time
             String departureTimeStr = "Now";
             if (departureTime != null) {
                 try {
@@ -204,7 +360,6 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
                 }
             }
 
-            // Calculate available seats
             int maxSeats = maxSeatsLong != null ? maxSeatsLong.intValue() : 3;
             int passengerCount = passengerCountLong != null ? passengerCountLong.intValue() : 0;
             int availableSeats = maxSeats - passengerCount;
@@ -223,8 +378,8 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
                     driverId,
                     passengerCount,
                     maxSeats,
-                    driverPhone != null ? driverPhone : "",  // Add driver phone
-                    distance != null ? distance : 0.0        // Add distance
+                    driverPhone != null ? driverPhone : "",
+                    distance != null ? distance : 0.0
             );
         } catch (Exception e) {
             Log.e(TAG, "Critical error parsing carpool", e);
@@ -232,20 +387,40 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
         }
     }
 
+    private void updateUIWithFilteredResults() {
+        List<Carpool> displayList = isSearchActive ? filteredList : carpoolList;
+        carpoolAdapter.updateCarpools(displayList);
+        updateUIState();
+    }
+
     private void updateUIState() {
-        if (carpoolList.isEmpty()) {
+        List<Carpool> displayList = isSearchActive ? filteredList : carpoolList;
+
+        if (displayList.isEmpty()) {
             emptyStateLayout.setVisibility(View.VISIBLE);
             carpoolsRecyclerView.setVisibility(View.GONE);
-            carpoolsCountText.setText("No carpools available");
-            if (subtitleText != null) {
-                subtitleText.setText("No carpool rides at the moment");
+
+            if (isSearchActive) {
+                carpoolsCountText.setText("No matching carpools");
+                if (subtitleText != null) {
+                    subtitleText.setText("Try different search terms");
+                }
+            } else {
+                carpoolsCountText.setText("No carpools available");
+                if (subtitleText != null) {
+                    subtitleText.setText("No carpool rides at the moment");
+                }
             }
         } else {
             emptyStateLayout.setVisibility(View.GONE);
             carpoolsRecyclerView.setVisibility(View.VISIBLE);
-            carpoolsCountText.setText(carpoolList.size() + " carpools available");
+            carpoolsCountText.setText(displayList.size() + " carpools available");
             if (subtitleText != null) {
-                subtitleText.setText("Share rides and save money!");
+                if (isSearchActive) {
+                    subtitleText.setText("Found " + displayList.size() + " matching carpools");
+                } else {
+                    subtitleText.setText("Share rides and save money!");
+                }
             }
         }
     }
@@ -275,10 +450,7 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
         carpoolsCountText.setText(message);
     }
 
-    private void showFilterDialog() {
-        Toast.makeText(this, "Filter feature coming soon!", Toast.LENGTH_SHORT).show();
-    }
-
+    // Rest of the methods remain the same (onCarpoolRequestClick, joinCarpool, etc.)
     @Override
     public void onCarpoolRequestClick(Carpool carpool) {
         FirebaseUser currentUser = mAuth.getCurrentUser();
@@ -289,7 +461,6 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
 
         String currentUserId = currentUser.getUid();
 
-        // Prevent drivers from joining their own carpool
         if (currentUserId.equals(carpool.getDriverId())) {
             new androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("Cannot Join Own Carpool")
@@ -300,13 +471,11 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
             return;
         }
 
-        // Check if user has already joined
         if (carpool.isUserAlreadyJoined()) {
             Toast.makeText(this, "You have already joined this carpool!", Toast.LENGTH_LONG).show();
             return;
         }
 
-        // Check if carpool is full
         if (carpool.getAvailableSeats() <= 0) {
             Toast.makeText(this, "This carpool is already full!", Toast.LENGTH_LONG).show();
             return;
@@ -371,15 +540,6 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
         }
     }
 
-    // In AvailableCarpoolsActivity.java
-// Replace the joinCarpool() method with this fixed version:
-
-    // In AvailableCarpoolsActivity.java
-// Replace the joinCarpool() method with this fixed version:
-
-    // In AvailableCarpoolsActivity.java
-// Replace the joinCarpool() method with this fixed version:
-
     private void joinCarpool(Carpool carpool) {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser == null) return;
@@ -387,7 +547,6 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
         String passengerId = currentUser.getUid();
         Toast.makeText(this, "Joining carpool...", Toast.LENGTH_SHORT).show();
 
-        // Get passenger's name from Firestore
         db.collection("users").document(passengerId)
                 .get()
                 .addOnSuccessListener(userDocument -> {
@@ -405,19 +564,16 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
 
                     final String finalPassengerName = passengerName;
 
-                    // Update carpool with passenger info
                     db.collection("ride_requests").document(carpool.getId())
                             .update(
                                     FIELD_PASSENGER_IDS, com.google.firebase.firestore.FieldValue.arrayUnion(passengerId),
                                     "passengerNames", com.google.firebase.firestore.FieldValue.arrayUnion(passengerName),
                                     FIELD_PASSENGER_COUNT, com.google.firebase.firestore.FieldValue.increment(1),
-                                    "lastUpdatedBy", passengerId  // Track who made this update
+                                    "lastUpdatedBy", passengerId
                             )
                             .addOnSuccessListener(aVoid -> {
                                 Toast.makeText(this, "✅ Joined carpool successfully!", Toast.LENGTH_LONG).show();
                                 Log.d(TAG, "✅ Carpool joined successfully");
-
-                                // Check if carpool is now full
                                 checkAndUpdateCarpoolStatus(carpool, passengerId);
                             })
                             .addOnFailureListener(e -> {
@@ -432,7 +588,6 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
                 });
     }
 
-    // Update checkAndUpdateCarpoolStatus to include notificationSentBy
     private void checkAndUpdateCarpoolStatus(Carpool carpool, String passengerId) {
         db.collection("ride_requests").document(carpool.getId())
                 .get()
@@ -443,11 +598,10 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
 
                         if (passengerCount != null && maxSeats != null) {
                             if (passengerCount >= maxSeats) {
-                                // Carpool is full - mark as accepted
                                 db.collection("ride_requests").document(carpool.getId())
                                         .update(
                                                 FIELD_STATUS, "accepted",
-                                                "notificationSentBy", passengerId  // Last person who joined
+                                                "notificationSentBy", passengerId
                                         )
                                         .addOnSuccessListener(aVoid -> {
                                             Toast.makeText(this,
@@ -459,12 +613,9 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
                                             Log.e(TAG, "Error updating carpool status to accepted", e);
                                         });
                             } else {
-                                // Carpool not full yet - send notification directly to driver
-                                // Since status doesn't change, we need to send notification here
                                 db.collection("ride_requests").document(carpool.getId())
                                         .get()
                                         .addOnSuccessListener(carpoolDoc -> {
-                                            // Only send notification to DRIVER (not the passenger who just joined)
                                             String driverId = carpoolDoc.getString("driverId");
                                             if (driverId != null && !driverId.equals(passengerId)) {
                                                 RideNotificationManager notificationManager =
@@ -481,8 +632,6 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
                     Log.e(TAG, "Error checking carpool status", e);
                 });
     }
-
-
 
     @Override
     protected void onResume() {
@@ -501,5 +650,11 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
             carpoolsListener.remove();
             carpoolsListener = null;
         }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        hideSearchPanel();
     }
 }

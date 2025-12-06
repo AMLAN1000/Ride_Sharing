@@ -15,8 +15,8 @@ public class Carpool {
     private int passengerCount;
     private int maxSeats;
     private boolean userAlreadyJoined;
-    private String driverPhone; // Add this
-    private double distance; // Add this
+    private String driverPhone;
+    private double distance;
 
     public Carpool(String id, String driverName, String vehicleModel, int availableSeats,
                    double rating, String source, String destination, String departureTime,
@@ -70,4 +70,8 @@ public class Carpool {
     public void setUserAlreadyJoined(boolean userAlreadyJoined) {
         this.userAlreadyJoined = userAlreadyJoined;
     }
+
+    // ✅ ADD THESE TWO ALIAS METHODS
+    public String getPickupLocation() { return source; }
+    public String getDropLocation() { return destination; }
 }
