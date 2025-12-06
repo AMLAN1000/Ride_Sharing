@@ -150,6 +150,10 @@ public class MyRidesActivity extends AppCompatActivity {
             public void onCancelRideClick(MyRideItem ride) {
                 showCancelRideDialog(ride);
             }
+            @Override
+            public void onTrackClick(MyRideItem ride) {
+                openTracking(ride);
+            }
         });
         recyclerView.setAdapter(adapter);
     }
@@ -748,6 +752,21 @@ public class MyRidesActivity extends AppCompatActivity {
             default:
                 return 5;
         }
+    }
+    private void openTracking(MyRideItem ride) {
+        // Only allow tracking for accepted (ongoing) rides
+        if (!"accepted".equals(ride.getStatus())) {
+            Toast.makeText(this, "Tracking is only available for ongoing rides", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Intent intent = new Intent(this, RideTrackingActivity.class);
+        intent.putExtra("rideId", ride.getId());
+        intent.putExtra("otherPersonName", ride.getOtherPersonName());
+        intent.putExtra("pickupLocation", ride.getPickupLocation());
+        intent.putExtra("dropLocation", ride.getDropLocation());
+        intent.putExtra("isDriver", !ride.isPassengerView());
+        startActivity(intent);
     }
     private void showLoading() {
         progressBar.setVisibility(View.VISIBLE);

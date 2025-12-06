@@ -18,6 +18,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RideSharing">
         <activity
+            android:name=".RideTrackingActivity"
+            android:exported="false" />
+        <activity
             android:name=".ChatActivity"
             android:exported="false" />
 

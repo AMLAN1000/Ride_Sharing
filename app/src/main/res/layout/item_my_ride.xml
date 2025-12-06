@@ -280,7 +280,7 @@
 
         </LinearLayout>
 
-        <!-- Action Buttons - Row 2 -->
+        <!-- Action Buttons - Row 2 (CORRECTED ORDER: Track FIRST) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -288,6 +288,24 @@
             android:layout_marginTop="8dp"
             android:gravity="center">
 
+            <!-- Track Button - FIRST POSITION -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_track"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:text="Track"
+                android:textSize="12sp"
+                app:icon="@android:drawable/ic_menu_mylocation"
+                app:iconGravity="textStart"
+                app:iconPadding="4dp"
+                style="@style/Widget.MaterialComponents.Button"
+                app:backgroundTint="@android:color/holo_orange_dark"
+                android:textColor="@android:color/white"
+                android:layout_marginEnd="4dp"
+                android:visibility="gone" />
+
+            <!-- Cancel Button - SECOND POSITION -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_cancel"
                 android:layout_width="0dp"
@@ -301,8 +319,10 @@
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 app:strokeColor="@android:color/holo_red_dark"
                 android:textColor="@android:color/holo_red_dark"
+                android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp" />
 
+            <!-- Complete Button - THIRD POSITION -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_complete"
                 android:layout_width="0dp"

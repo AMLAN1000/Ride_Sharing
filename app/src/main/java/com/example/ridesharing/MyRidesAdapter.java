@@ -26,6 +26,7 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
         void onViewDetailsClick(MyRideItem ride);
         void onCompleteRideClick(MyRideItem ride);
         void onCancelRideClick(MyRideItem ride);
+        void onTrackClick(MyRideItem ride);
     }
 
     public MyRidesAdapter(List<MyRideItem> rides, OnRideItemClickListener listener) {
@@ -59,7 +60,7 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
         private TextView tvPickupLocation, tvDropLocation;
         private TextView tvFare, tvVehicleInfo, tvDepartureTime;
         private TextView tvOtherPersonPhone;
-        private MaterialButton btnCall, btnMessage, btnViewDetails, btnComplete, btnCancel;
+        private MaterialButton btnCall, btnMessage, btnViewDetails, btnComplete, btnCancel, btnTrack;
         private TextView tvUnreadBadge; // NEW
 
         public ViewHolder(@NonNull View itemView) {
@@ -82,6 +83,7 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
                 btnViewDetails = itemView.findViewById(R.id.btn_view_details);
                 btnComplete = itemView.findViewById(R.id.btn_complete);
                 btnCancel = itemView.findViewById(R.id.btn_cancel);
+                btnTrack = itemView.findViewById(R.id.btn_track);
                 tvUnreadBadge = itemView.findViewById(R.id.tv_unread_badge); // NEW
             } catch (Exception e) {
                 e.printStackTrace();
@@ -235,6 +237,12 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
                 });
             }
 
+            if (btnTrack != null) {
+                btnTrack.setOnClickListener(v -> {
+                    if (listener != null) listener.onTrackClick(ride);
+                });
+            }
+
             // Button visibility logic
             if (btnComplete != null && btnCancel != null && btnCall != null && btnMessage != null) {
                 boolean isPassenger = ride.isPassengerView();
@@ -258,6 +266,11 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
 
                 // Message button - show for accepted (ongoing) rides
                 btnMessage.setVisibility("accepted".equals(statusLower) ? View.VISIBLE : View.GONE);
+
+                // Track button - show only for accepted (ongoing) rides
+                if (btnTrack != null) {
+                    btnTrack.setVisibility("accepted".equals(statusLower) ? View.VISIBLE : View.GONE);
+                }
             }
         }
     }
