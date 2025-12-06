@@ -37,7 +37,7 @@ public class LoginActivity extends AppCompatActivity {
 
     private static final String TAG = "LoginActivity";
     private static final int RC_SIGN_IN = 9001;
-    private static final String REQUIRED_EMAIL_DOMAIN = "@std.ewubd.edu";
+    private static final String REQUIRED_EMAIL_DOMAIN = "ewubd.edu";
 
     private TextInputEditText etEmail, etPassword;
     private MaterialButton btnLogin, btnGoogleSignIn;
@@ -150,12 +150,12 @@ public class LoginActivity extends AppCompatActivity {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
                 Log.d(TAG, "Google sign in successful: " + account.getEmail());
 
-                // Check if Google account email has correct domain
+                // ✅ FIX: Check if Google account email ends with ewubd.edu
                 if (account.getEmail() != null && account.getEmail().endsWith(REQUIRED_EMAIL_DOMAIN)) {
                     firebaseAuthWithGoogle(account.getIdToken());
                 } else {
                     showLoading(false);
-                    Toast.makeText(this, "Please use your @std.ewubd.edu email account", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Please use your EWU email account (e.g., @std.ewubd.edu, @faculty.ewubd.edu)", Toast.LENGTH_LONG).show();
                     mGoogleSignInClient.signOut();
                     Log.d(TAG, "Invalid email domain: " + account.getEmail());
                 }
@@ -310,8 +310,9 @@ public class LoginActivity extends AppCompatActivity {
             return false;
         }
 
+        // ✅ FIX: Validate email domain (must end with ewubd.edu)
         if (!email.endsWith(REQUIRED_EMAIL_DOMAIN)) {
-            etEmail.setError("Email must be from @std.ewubd.edu domain");
+            etEmail.setError("Email must be from EWU domain (e.g., @std.ewubd.edu, @faculty.ewubd.edu)");
             etEmail.requestFocus();
             return false;
         }

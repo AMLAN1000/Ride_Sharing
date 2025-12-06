@@ -40,7 +40,7 @@ public class SignupActivity extends AppCompatActivity {
 
     private static final String TAG = "SignUpActivity";
     private static final int RC_SIGN_IN = 9001;
-    private static final String REQUIRED_EMAIL_DOMAIN = "@std.ewubd.edu";
+    private static final String REQUIRED_EMAIL_DOMAIN = "ewubd.edu";
 
     // UI Components
     private TextInputEditText etFullName, etEmail, etPhone, etStudentId, etPassword, etConfirmPassword;
@@ -134,9 +134,9 @@ public class SignupActivity extends AppCompatActivity {
             return false;
         }
 
-        // Validate email domain
+        // ✅ FIX: Validate email domain (must end with ewubd.edu)
         if (!email.endsWith(REQUIRED_EMAIL_DOMAIN)) {
-            etEmail.setError("Email must be from @std.ewubd.edu domain");
+            etEmail.setError("Email must be from EWU domain (e.g., @std.ewubd.edu, @faculty.ewubd.edu)");
             etEmail.requestFocus();
             return false;
         }
@@ -147,9 +147,22 @@ public class SignupActivity extends AppCompatActivity {
             return false;
         }
 
-        // Validate phone number (basic validation)
-        if (phone.length() < 10) {
-            etPhone.setError("Please enter a valid phone number");
+        // ✅ FIX: Validate phone number (must start with 01 and be exactly 11 digits)
+        if (!phone.startsWith("01")) {
+            etPhone.setError("Phone number must start with 01");
+            etPhone.requestFocus();
+            return false;
+        }
+
+        if (phone.length() != 11) {
+            etPhone.setError("Phone number must be exactly 11 digits (e.g., 01712345678)");
+            etPhone.requestFocus();
+            return false;
+        }
+
+        // ✅ FIX: Validate phone contains only digits
+        if (!phone.matches("\\d+")) {
+            etPhone.setError("Phone number must contain only digits");
             etPhone.requestFocus();
             return false;
         }
@@ -237,12 +250,12 @@ public class SignupActivity extends AppCompatActivity {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
                 Log.d(TAG, "firebaseAuthWithGoogle:" + account.getId());
 
-                // Check if Google account email has correct domain
+                // ✅ FIX: Check if Google account email ends with ewubd.edu
                 if (account.getEmail() != null && account.getEmail().endsWith(REQUIRED_EMAIL_DOMAIN)) {
                     firebaseAuthWithGoogle(account.getIdToken());
                 } else {
                     showProgressBar(false);
-                    Toast.makeText(this, "Please use your @std.ewubd.edu email account", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Please use your EWU email account (e.g., @std.ewubd.edu, @faculty.ewubd.edu)", Toast.LENGTH_LONG).show();
                     mGoogleSignInClient.signOut(); // Sign out from Google
                 }
             } catch (ApiException e) {
@@ -252,7 +265,6 @@ public class SignupActivity extends AppCompatActivity {
             }
         }
     }
-
     private void firebaseAuthWithGoogle(String idToken) {
         AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
         mAuth.signInWithCredential(credential)
