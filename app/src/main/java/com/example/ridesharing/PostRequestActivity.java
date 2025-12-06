@@ -706,14 +706,50 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void checkFareFairness() {
-        btnCheckFare.setText("Calculating...");
+        // Disable button and show analyzing state
+        btnCheckFare.setText("Analyzing...");
         btnCheckFare.setEnabled(false);
         layoutFareAnalysis.setVisibility(View.VISIBLE);
 
-        new Thread(() -> {
-            calculateFareFairness();
-            runOnUiThread(this::resetCheckFareButton);
-        }).start();
+        // Show professional analyzing messages
+        tvFairnessMessage.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        tvFairnessMessage.setText("🔍 Analyzing fare fairness...");
+        tvDetailedReason.setVisibility(View.VISIBLE);
+        tvSuggestion.setVisibility(View.GONE);
+
+        // Professional step-by-step analysis display
+        final String[] analysisSteps = {
+                "📍 Calculating route distance...",
+                "🚦 Analyzing traffic conditions...",
+                "🌤️ Checking weather impact...",
+                "⏰ Evaluating time factors...",
+                "💰 Computing fair fare range...",
+                "✅ Finalizing results..."
+        };
+
+        final int[] stepIndex = {0};
+        final android.os.Handler handler = new android.os.Handler();
+
+        // Show each step with 300ms delay
+        Runnable stepRunner = new Runnable() {
+            @Override
+            public void run() {
+                if (stepIndex[0] < analysisSteps.length) {
+                    tvDetailedReason.setText(analysisSteps[stepIndex[0]]);
+                    stepIndex[0]++;
+                    handler.postDelayed(this, 300); // 300ms per step = ~2 seconds total
+                } else {
+                    // All steps done, now calculate actual fairness
+                    new Thread(() -> {
+                        calculateFareFairness();
+                        runOnUiThread(() -> resetCheckFareButton());
+                    }).start();
+                }
+            }
+        };
+
+        // Start the step-by-step animation
+        handler.post(stepRunner);
     }
 
     private void calculateFareFairness() {
