@@ -3,6 +3,8 @@ package com.example.ridesharing;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
@@ -12,6 +14,8 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -27,15 +31,25 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
 
     private RecyclerView ridesRecyclerView;
     private RideAdapter rideAdapter;
-    private View emptyStateLayout;
+    private View emptyStateLayout, searchPanel;
     private ProgressBar progressBar;
     private TextView ridesCountText, subtitleText;
+    private Chip chipActiveFilter;
+    private TextInputEditText etFromLocation, etToLocation;
+    private ImageView filterButton;
+
     private List<Ride> rideList = new ArrayList<>();
+    private List<Ride> filteredList = new ArrayList<>();
 
     private FirebaseFirestore db;
     private FirebaseAuth mAuth;
     private ListenerRegistration ridesListener;
     private boolean isLoading = false;
+
+    // Search State
+    private boolean isSearchActive = false;
+    private String currentFromFilter = "";
+    private String currentToFilter = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,6 +59,7 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
         initializeFirebase();
         initializeViews();
         setupRecyclerView();
+        setupSearchFunctionality();
         loadAvailableRides();
         ExpiredRequestsCleaner.cleanExpiredPendingRequests();
 
@@ -60,20 +75,163 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
         ridesRecyclerView = findViewById(R.id.rides_recyclerview);
         emptyStateLayout = findViewById(R.id.empty_state_layout);
         progressBar = findViewById(R.id.progress_bar);
+        searchPanel = findViewById(R.id.search_panel);
+        chipActiveFilter = findViewById(R.id.chip_active_filter);
+        etFromLocation = findViewById(R.id.et_from_location);
+        etToLocation = findViewById(R.id.et_to_location);
         ridesCountText = findViewById(R.id.rides_count_text);
         subtitleText = findViewById(R.id.subtitle_text);
+        filterButton = findViewById(R.id.filter_button);
 
-        ImageView filterButton = findViewById(R.id.filter_button);
         if (filterButton != null) {
-            filterButton.setOnClickListener(v -> showFilterDialog());
+            filterButton.setOnClickListener(v -> toggleSearchPanel());
         }
+    }
+
+    private void setupSearchFunctionality() {
+        View btnConfirmSearch = findViewById(R.id.btn_confirm_search);
+        if (btnConfirmSearch != null) {
+            btnConfirmSearch.setOnClickListener(v -> applySearchFilter());
+        }
+
+        View btnCancelSearch = findViewById(R.id.btn_cancel_search);
+        if (btnCancelSearch != null) {
+            btnCancelSearch.setOnClickListener(v -> cancelSearch());
+        }
+
+        if (chipActiveFilter != null) {
+            chipActiveFilter.setOnCloseIconClickListener(v -> clearSearchFilter());
+        }
+
+        if (etFromLocation != null) {
+            etFromLocation.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (isSearchActive) {
+                        applySearchFilter();
+                    }
+                }
+            });
+        }
+
+        if (etToLocation != null) {
+            etToLocation.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (isSearchActive) {
+                        applySearchFilter();
+                    }
+                }
+            });
+        }
+    }
+
+    private void toggleSearchPanel() {
+        if (searchPanel != null) {
+            if (searchPanel.getVisibility() == View.VISIBLE) {
+                hideSearchPanel();
+            } else {
+                showSearchPanel();
+            }
+        }
+    }
+
+    private void showSearchPanel() {
+        if (searchPanel != null) {
+            searchPanel.setVisibility(View.VISIBLE);
+        }
+        if (etFromLocation != null) {
+            etFromLocation.requestFocus();
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(etFromLocation, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }
+        }
+    }
+
+    private void hideSearchPanel() {
+        if (searchPanel != null) {
+            searchPanel.setVisibility(View.GONE);
+        }
+        if (etFromLocation != null) {
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(etFromLocation.getWindowToken(), 0);
+            }
+        }
+    }
+
+    private void applySearchFilter() {
+        String from = etFromLocation != null ? etFromLocation.getText().toString().trim().toLowerCase(Locale.ROOT) : "";
+        String to = etToLocation != null ? etToLocation.getText().toString().trim().toLowerCase(Locale.ROOT) : "";
+
+        currentFromFilter = from;
+        currentToFilter = to;
+
+        filteredList.clear();
+        for (Ride ride : rideList) {
+            String pickup = ride.getPickupLocation();
+            String drop = ride.getDropLocation();
+
+            boolean matchesFrom = from.isEmpty() || (pickup != null && pickup.toLowerCase(Locale.ROOT).contains(from));
+            boolean matchesTo = to.isEmpty() || (drop != null && drop.toLowerCase(Locale.ROOT).contains(to));
+
+            if (matchesFrom && matchesTo) {
+                filteredList.add(ride);
+            }
+        }
+
+        isSearchActive = !from.isEmpty() || !to.isEmpty();
+
+        if (isSearchActive && chipActiveFilter != null) {
+            chipActiveFilter.setVisibility(View.VISIBLE);
+            String filterText = "Filter: ";
+            if (!from.isEmpty()) filterText += "From " + from;
+            if (!to.isEmpty()) filterText += (from.isEmpty() ? "To " : " to ") + to;
+            chipActiveFilter.setText(filterText);
+        } else if (chipActiveFilter != null) {
+            chipActiveFilter.setVisibility(View.GONE);
+        }
+
+        updateUIWithFilteredResults();
+        hideSearchPanel();
+    }
+
+    private void cancelSearch() {
+        hideSearchPanel();
+    }
+
+    private void clearSearchFilter() {
+        if (etFromLocation != null) etFromLocation.setText("");
+        if (etToLocation != null) etToLocation.setText("");
+        currentFromFilter = "";
+        currentToFilter = "";
+        isSearchActive = false;
+        if (chipActiveFilter != null) chipActiveFilter.setVisibility(View.GONE);
+        updateUIWithFilteredResults();
+    }
+
+    private void updateUIWithFilteredResults() {
+        List<Ride> displayList = isSearchActive ? filteredList : rideList;
+        rideAdapter.updateRides(displayList);
+        updateUIState();
     }
 
     private void setupRecyclerView() {
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         ridesRecyclerView.setLayoutManager(layoutManager);
         ridesRecyclerView.setHasFixedSize(true);
-        rideAdapter = new RideAdapter(rideList, this);
+        rideAdapter = new RideAdapter(filteredList, this);
         ridesRecyclerView.setAdapter(rideAdapter);
     }
 
@@ -138,7 +296,15 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                     runOnUiThread(() -> {
                         rideList.clear();
                         rideList.addAll(newRides);
-                        rideAdapter.updateRides(rideList);
+
+                        if (isSearchActive) {
+                            applySearchFilter();
+                        } else {
+                            filteredList.clear();
+                            filteredList.addAll(rideList);
+                            rideAdapter.updateRides(filteredList);
+                        }
+
                         hideLoadingState();
                         updateUIState();
                     });
@@ -199,19 +365,33 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
     }
 
     private void updateUIState() {
-        if (rideList.isEmpty()) {
+        List<Ride> displayList = isSearchActive ? filteredList : rideList;
+
+        if (displayList.isEmpty()) {
             emptyStateLayout.setVisibility(View.VISIBLE);
             ridesRecyclerView.setVisibility(View.GONE);
-            ridesCountText.setText("No rides available");
-            if (subtitleText != null) {
-                subtitleText.setText("No driver-posted rides at the moment");
+
+            if (isSearchActive) {
+                ridesCountText.setText("No matching rides");
+                if (subtitleText != null) {
+                    subtitleText.setText("Try different search terms");
+                }
+            } else {
+                ridesCountText.setText("No rides available");
+                if (subtitleText != null) {
+                    subtitleText.setText("No driver-posted rides at the moment");
+                }
             }
         } else {
             emptyStateLayout.setVisibility(View.GONE);
             ridesRecyclerView.setVisibility(View.VISIBLE);
-            ridesCountText.setText(rideList.size() + " rides available");
+            ridesCountText.setText(displayList.size() + " rides available");
             if (subtitleText != null) {
-                subtitleText.setText(rideList.size() + " rides near you");
+                if (isSearchActive) {
+                    subtitleText.setText("Found " + displayList.size() + " matching rides");
+                } else {
+                    subtitleText.setText(displayList.size() + " rides near you");
+                }
             }
         }
     }
@@ -239,10 +419,6 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
         }
         ridesRecyclerView.setVisibility(View.GONE);
         ridesCountText.setText(message);
-    }
-
-    private void showFilterDialog() {
-        Toast.makeText(this, "Filter feature coming soon!", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -320,14 +496,10 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
         }
     }
 
-    // In AvailableRidesActivity.java
-// Replace the acceptRide() method with this fixed version:
-
     private void acceptRide(Ride ride) {
         String passengerId = mAuth.getCurrentUser().getUid();
         Toast.makeText(this, "Accepting ride...", Toast.LENGTH_SHORT).show();
 
-        // Get passenger's name and phone from Firestore
         db.collection("users").document(passengerId)
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
@@ -348,7 +520,6 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                         }
                     }
 
-                    // Update ride with passenger info
                     db.collection("ride_requests").document(ride.getId())
                             .update(
                                     "status", "accepted",
@@ -357,14 +528,11 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                                     "passengerPhone", passengerPhone,
                                     "acceptedAt", System.currentTimeMillis(),
                                     "notificationShown", false,
-                                    "notificationSentBy", passengerId  // ✅ Track who triggered this
+                                    "notificationSentBy", passengerId
                             )
                             .addOnSuccessListener(aVoid -> {
                                 Toast.makeText(this, "✅ Ride accepted! Contact " +
                                         ride.getDriverName(), Toast.LENGTH_LONG).show();
-
-                                // ❌ DON'T send notification here!
-                                // Let StatusMonitor handle it so only driver device gets it
                                 Log.d(TAG, "✅ Ride accepted, StatusMonitor will notify driver");
                             })
                             .addOnFailureListener(e -> {
@@ -392,5 +560,11 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
             ridesListener.remove();
             ridesListener = null;
         }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        hideSearchPanel();
     }
 }

@@ -12,10 +12,10 @@ public class Ride {
     private String arrivalTime;
     private double fare;
     private String driverId;
-    private String driverPhone; // Add this
-    private double distance; // Add this
-    private boolean isFareFair; // Add this
-    private int maxSeats; // Add this
+    private String driverPhone;
+    private double distance;
+    private boolean isFareFair;
+    private int maxSeats;
 
     // Empty constructor (needed for Firebase later)
     public Ride() {
@@ -85,7 +85,6 @@ public class Ride {
     public String getDriverId() { return driverId; }
     public void setDriverId(String driverId) { this.driverId = driverId; }
 
-    // New getters and setters
     public String getDriverPhone() { return driverPhone; }
     public void setDriverPhone(String driverPhone) { this.driverPhone = driverPhone; }
 
@@ -97,4 +96,8 @@ public class Ride {
 
     public int getMaxSeats() { return maxSeats; }
     public void setMaxSeats(int maxSeats) { this.maxSeats = maxSeats; }
+
+    // ✅ ALIAS METHODS FOR FILTER COMPATIBILITY
+    public String getPickupLocation() { return source; }
+    public String getDropLocation() { return destination; }
 }
