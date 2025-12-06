@@ -25,6 +25,7 @@ public class MyRideItem {
     private int maxSeats;
     private int passengerCount;
     private String allPassengerNames; // For displaying multiple passengers
+    private int unreadMessageCount; // NEW: For unread message badge
 
     public MyRideItem(String id, String status, String pickupLocation, String dropLocation,
                       double fare, String vehicleType, int passengers,
@@ -33,7 +34,7 @@ public class MyRideItem {
                       boolean isPassengerView) {
         this(id, status, pickupLocation, dropLocation, fare, vehicleType, passengers,
                 departureTime, acceptedAt, otherPersonName, otherPersonPhone, otherPersonId,
-                isPassengerView, false, 0.0, 1, 0, "");
+                isPassengerView, false, 0.0, 1, 0, "", 0);
     }
 
     public MyRideItem(String id, String status, String pickupLocation, String dropLocation,
@@ -41,7 +42,7 @@ public class MyRideItem {
                       Long departureTime, Long acceptedAt,
                       String otherPersonName, String otherPersonPhone, String otherPersonId,
                       boolean isPassengerView, boolean isCarpool, double farePerPassenger,
-                      int maxSeats, int passengerCount, String allPassengerNames) {
+                      int maxSeats, int passengerCount, String allPassengerNames, int unreadMessageCount) {
         this.id = id;
         this.status = status;
         this.pickupLocation = pickupLocation;
@@ -60,6 +61,7 @@ public class MyRideItem {
         this.maxSeats = maxSeats;
         this.passengerCount = passengerCount;
         this.allPassengerNames = allPassengerNames;
+        this.unreadMessageCount = unreadMessageCount;
     }
 
     // Getters
@@ -83,6 +85,7 @@ public class MyRideItem {
     public int getMaxSeats() { return maxSeats; }
     public int getPassengerCount() { return passengerCount; }
     public String getAllPassengerNames() { return allPassengerNames; }
+    public int getUnreadMessageCount() { return unreadMessageCount; }
 
     // Helper methods
     public String getRoleLabel() {

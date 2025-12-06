@@ -24,6 +24,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MyRidesActivity extends AppCompatActivity {
 
@@ -432,7 +434,7 @@ public class MyRidesActivity extends AppCompatActivity {
                 }
             }
 
-            return new MyRideItem(
+            MyRideItem rideItem = new MyRideItem(
                     id,
                     status != null ? status : "unknown",
                     pickupLocation != null ? pickupLocation : "",
@@ -450,12 +452,76 @@ public class MyRidesActivity extends AppCompatActivity {
                     farePerPassenger != null ? farePerPassenger : 0.0,
                     maxSeats != null ? maxSeats.intValue() : 1,
                     passengerCount != null ? passengerCount.intValue() : 0,
-                    allPassengerNames
+                    allPassengerNames,
+                    0 // Will be updated by countUnreadMessages
             );
+
+            // Count unread messages asynchronously
+            countUnreadMessages(id, rideItem);
+
+            return rideItem;
         } catch (Exception e) {
             Log.e(TAG, "Error parsing ride item", e);
             return null;
         }
+    }
+
+    private void countUnreadMessages(String rideId, MyRideItem rideItem) {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) return;
+
+        String currentUserId = currentUser.getUid();
+
+        db.collection("ride_requests")
+                .document(rideId)
+                .collection("messages")
+                .whereEqualTo("isRead", false)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    int unreadCount = 0;
+                    for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        String senderId = doc.getString("senderId");
+                        // Count only messages NOT sent by current user
+                        if (senderId != null && !senderId.equals(currentUserId)) {
+                            unreadCount++;
+                        }
+                    }
+
+                    // Update the ride item with unread count
+                    if (unreadCount > 0) {
+                        // Find and update the ride in the list
+                        for (int i = 0; i < ridesList.size(); i++) {
+                            if (ridesList.get(i).getId().equals(rideId)) {
+                                // Create updated ride item with unread count
+                                MyRideItem updatedRide = new MyRideItem(
+                                        rideItem.getId(),
+                                        rideItem.getStatus(),
+                                        rideItem.getPickupLocation(),
+                                        rideItem.getDropLocation(),
+                                        rideItem.getFare(),
+                                        rideItem.getVehicleType(),
+                                        rideItem.getPassengers(),
+                                        rideItem.getDepartureTime(),
+                                        rideItem.getAcceptedAt(),
+                                        rideItem.getOtherPersonName(),
+                                        rideItem.getOtherPersonPhone(),
+                                        rideItem.getOtherPersonId(),
+                                        rideItem.isPassengerView(),
+                                        rideItem.isCarpool(),
+                                        rideItem.getFarePerPassenger(),
+                                        rideItem.getMaxSeats(),
+                                        rideItem.getPassengerCount(),
+                                        rideItem.getAllPassengerNames(),
+                                        unreadCount
+                                );
+                                ridesList.set(i, updatedRide);
+                                adapter.notifyItemChanged(i);
+                                break;
+                            }
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "Error counting unread messages", e));
     }
 
     private void openChat(MyRideItem ride) {

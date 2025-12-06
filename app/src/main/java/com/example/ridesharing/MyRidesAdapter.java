@@ -60,6 +60,7 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
         private TextView tvFare, tvVehicleInfo, tvDepartureTime;
         private TextView tvOtherPersonPhone;
         private MaterialButton btnCall, btnMessage, btnViewDetails, btnComplete, btnCancel;
+        private TextView tvUnreadBadge; // NEW
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -81,6 +82,7 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
                 btnViewDetails = itemView.findViewById(R.id.btn_view_details);
                 btnComplete = itemView.findViewById(R.id.btn_complete);
                 btnCancel = itemView.findViewById(R.id.btn_cancel);
+                tvUnreadBadge = itemView.findViewById(R.id.tv_unread_badge); // NEW
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -202,6 +204,17 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
                 btnMessage.setOnClickListener(v -> {
                     if (listener != null) listener.onMessageClick(ride);
                 });
+
+                // Show unread badge if there are unread messages
+                if (tvUnreadBadge != null) {
+                    int unreadCount = ride.getUnreadMessageCount();
+                    if (unreadCount > 0) {
+                        tvUnreadBadge.setText(String.valueOf(unreadCount));
+                        tvUnreadBadge.setVisibility(View.VISIBLE);
+                    } else {
+                        tvUnreadBadge.setVisibility(View.GONE);
+                    }
+                }
             }
 
             if (btnViewDetails != null) {
