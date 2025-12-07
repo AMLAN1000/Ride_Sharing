@@ -11,7 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="@color/blue"
+        android:background="#673AB7"
         android:elevation="4dp"
         android:padding="12dp">
 
@@ -127,7 +127,7 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginStart="8dp"
-            android:background="@drawable/bg_send_button"
+            android:background="@drawable/bg_message_sent"
             android:src="@drawable/ic_send"
             android:tint="@android:color/white"
             android:contentDescription="Send message" />
