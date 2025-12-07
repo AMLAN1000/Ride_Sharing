@@ -154,6 +154,10 @@ public class MyRidesActivity extends AppCompatActivity {
             public void onTrackClick(MyRideItem ride) {
                 openTracking(ride);
             }
+            @Override
+            public void onSafetyClick(MyRideItem ride) {
+                openSafety(ride);
+            }
         });
         recyclerView.setAdapter(adapter);
     }
@@ -767,6 +771,82 @@ public class MyRidesActivity extends AppCompatActivity {
         intent.putExtra("dropLocation", ride.getDropLocation());
         intent.putExtra("isDriver", !ride.isPassengerView());
         startActivity(intent);
+    }
+    // Replace openSafety in MyRidesActivity.java with this EXTREME DEBUG VERSION
+
+    private void openSafety(MyRideItem ride) {
+        android.util.Log.e("SAFETY_TEST", "");
+        android.util.Log.e("SAFETY_TEST", "╔════════════════════════════════════════╗");
+        android.util.Log.e("SAFETY_TEST", "║   OPENSAFETY METHOD WAS CALLED!!!      ║");
+        android.util.Log.e("SAFETY_TEST", "╚════════════════════════════════════════╝");
+        android.util.Log.e("SAFETY_TEST", "");
+
+        Toast.makeText(this, "🔥 openSafety() method called!", Toast.LENGTH_LONG).show();
+
+        android.util.Log.e("SAFETY_TEST", "Step 1: Checking if ride is null...");
+        if (ride == null) {
+            android.util.Log.e("SAFETY_TEST", "❌ RIDE IS NULL!");
+            Toast.makeText(this, "ERROR: Ride is null!", Toast.LENGTH_LONG).show();
+            return;
+        }
+        android.util.Log.e("SAFETY_TEST", "✅ Ride is NOT null");
+
+        android.util.Log.e("SAFETY_TEST", "Step 2: Getting ride details...");
+        android.util.Log.e("SAFETY_TEST", "  - Ride ID: " + ride.getId());
+        android.util.Log.e("SAFETY_TEST", "  - Status: " + ride.getStatus());
+        android.util.Log.e("SAFETY_TEST", "  - Pickup: " + ride.getPickupLocation());
+        android.util.Log.e("SAFETY_TEST", "  - Drop: " + ride.getDropLocation());
+
+        android.util.Log.e("SAFETY_TEST", "Step 3: Checking status...");
+        if (!"accepted".equals(ride.getStatus())) {
+            android.util.Log.e("SAFETY_TEST", "❌ Status is not 'accepted': " + ride.getStatus());
+            Toast.makeText(this, "Safety only for ongoing rides", Toast.LENGTH_LONG).show();
+            return;
+        }
+        android.util.Log.e("SAFETY_TEST", "✅ Status is 'accepted'");
+
+        android.util.Log.e("SAFETY_TEST", "Step 4: Checking ride ID...");
+        if (ride.getId() == null || ride.getId().isEmpty()) {
+            android.util.Log.e("SAFETY_TEST", "❌ Ride ID is null or empty!");
+            Toast.makeText(this, "ERROR: Ride ID missing!", Toast.LENGTH_LONG).show();
+            return;
+        }
+        android.util.Log.e("SAFETY_TEST", "✅ Ride ID exists: " + ride.getId());
+
+        android.util.Log.e("SAFETY_TEST", "Step 5: Preparing intent data...");
+        long rideStartTime = ride.getAcceptedAt() != null ? ride.getAcceptedAt() : System.currentTimeMillis();
+        String otherPersonName = ride.getOtherPersonName();
+        if (otherPersonName == null || otherPersonName.isEmpty()) {
+            otherPersonName = ride.isPassengerView() ? "Driver" : "Passenger";
+        }
+        android.util.Log.e("SAFETY_TEST", "  - Start time: " + rideStartTime);
+        android.util.Log.e("SAFETY_TEST", "  - Other person: " + otherPersonName);
+
+        android.util.Log.e("SAFETY_TEST", "Step 6: Creating intent...");
+        Intent intent = new Intent(this, SafetyActivity.class);
+        intent.putExtra("rideId", ride.getId());
+        intent.putExtra("pickupLocation", ride.getPickupLocation() != null ? ride.getPickupLocation() : "Unknown");
+        intent.putExtra("dropLocation", ride.getDropLocation() != null ? ride.getDropLocation() : "Unknown");
+        intent.putExtra("driverName", otherPersonName);
+        intent.putExtra("rideStartTime", rideStartTime);
+        android.util.Log.e("SAFETY_TEST", "✅ Intent created");
+
+        android.util.Log.e("SAFETY_TEST", "Step 7: Starting SafetyActivity...");
+        try {
+            Toast.makeText(this, "🚀 Starting SafetyActivity...", Toast.LENGTH_SHORT).show();
+            startActivity(intent);
+            android.util.Log.e("SAFETY_TEST", "✅✅✅ SafetyActivity started successfully!");
+        } catch (Exception e) {
+            android.util.Log.e("SAFETY_TEST", "❌❌❌ EXCEPTION!", e);
+            Toast.makeText(this, "CRASH: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            e.printStackTrace();
+        }
+
+        android.util.Log.e("SAFETY_TEST", "");
+        android.util.Log.e("SAFETY_TEST", "╔════════════════════════════════════════╗");
+        android.util.Log.e("SAFETY_TEST", "║   OPENSAFETY METHOD COMPLETED          ║");
+        android.util.Log.e("SAFETY_TEST", "╚════════════════════════════════════════╝");
+        android.util.Log.e("SAFETY_TEST", "");
     }
     private void showLoading() {
         progressBar.setVisibility(View.VISIBLE);

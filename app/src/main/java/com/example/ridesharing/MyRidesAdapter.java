@@ -14,6 +14,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import android.widget.Toast;
+
 
 public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHolder> {
 
@@ -27,6 +29,7 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
         void onCompleteRideClick(MyRideItem ride);
         void onCancelRideClick(MyRideItem ride);
         void onTrackClick(MyRideItem ride);
+        void onSafetyClick(MyRideItem ride);
     }
 
     public MyRidesAdapter(List<MyRideItem> rides, OnRideItemClickListener listener) {
@@ -60,12 +63,11 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
         private TextView tvPickupLocation, tvDropLocation;
         private TextView tvFare, tvVehicleInfo, tvDepartureTime;
         private TextView tvOtherPersonPhone;
-        private MaterialButton btnCall, btnMessage, btnViewDetails, btnComplete, btnCancel, btnTrack;
-        private TextView tvUnreadBadge; // NEW
+        private MaterialButton btnCall, btnMessage, btnViewDetails, btnComplete, btnCancel, btnTrack, btnSafety;
+        private TextView tvUnreadBadge;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
-            // Initialize all views with null checks
             try {
                 cardView = itemView.findViewById(R.id.card_my_ride);
                 chipStatus = itemView.findViewById(R.id.chip_status);
@@ -84,7 +86,8 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
                 btnComplete = itemView.findViewById(R.id.btn_complete);
                 btnCancel = itemView.findViewById(R.id.btn_cancel);
                 btnTrack = itemView.findViewById(R.id.btn_track);
-                tvUnreadBadge = itemView.findViewById(R.id.tv_unread_badge); // NEW
+                btnSafety = itemView.findViewById(R.id.btn_safety);
+                tvUnreadBadge = itemView.findViewById(R.id.tv_unread_badge);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -122,7 +125,6 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
             // Person name
             if (tvOtherPersonName != null) {
                 if (ride.isCarpool() && !ride.isPassengerView()) {
-                    // For drivers viewing carpools, show passenger count
                     tvOtherPersonName.setText(ride.getPassengerCount() + " passenger" +
                             (ride.getPassengerCount() != 1 ? "s" : ""));
                 } else {
@@ -243,10 +245,41 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
                 });
             }
 
-            // Button visibility logic
-            if (btnComplete != null && btnCancel != null && btnCall != null && btnMessage != null) {
+            // 🔥 FIX: Safety button click listener
+            if (btnSafety != null) {
+                btnSafety.setOnClickListener(v -> {
+                    // First, show a toast to confirm click is working
+                    Toast.makeText(v.getContext(), "🛡️ SAFETY BUTTON CLICKED!", Toast.LENGTH_LONG).show();
+
+                    // Log to confirm
+                    android.util.Log.e("SAFETY_TEST", "========================================");
+                    android.util.Log.e("SAFETY_TEST", "BUTTON WAS CLICKED!");
+                    android.util.Log.e("SAFETY_TEST", "Ride: " + (ride != null ? ride.getId() : "NULL"));
+                    android.util.Log.e("SAFETY_TEST", "Listener: " + (listener != null ? "EXISTS" : "NULL"));
+                    android.util.Log.e("SAFETY_TEST", "========================================");
+
+                    // Then call the listener
+                    if (listener != null) {
+                        android.util.Log.e("SAFETY_TEST", "Calling listener.onSafetyClick()...");
+                        listener.onSafetyClick(ride);
+                        android.util.Log.e("SAFETY_TEST", "listener.onSafetyClick() completed");
+                    } else {
+                        android.util.Log.e("SAFETY_TEST", "❌ LISTENER IS NULL!");
+                        Toast.makeText(v.getContext(), "ERROR: Listener is null", Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+            if (btnComplete != null && btnCancel != null && btnCall != null &&
+                    btnMessage != null && btnTrack != null && btnSafety != null) {
+
                 boolean isPassenger = ride.isPassengerView();
                 String statusLower = status.toLowerCase();
+
+                // Log visibility decision
+                android.util.Log.e("SAFETY_TEST", "Checking visibility for Safety button:");
+                android.util.Log.e("SAFETY_TEST", "  - isPassenger: " + isPassenger);
+                android.util.Log.e("SAFETY_TEST", "  - status: " + statusLower);
+                android.util.Log.e("SAFETY_TEST", "  - Should show: " + (isPassenger && "accepted".equals(statusLower)));
 
                 // Complete button - only for drivers on accepted rides
                 btnComplete.setVisibility(!isPassenger && "accepted".equals(statusLower) ? View.VISIBLE : View.GONE);
@@ -268,9 +301,14 @@ public class MyRidesAdapter extends RecyclerView.Adapter<MyRidesAdapter.ViewHold
                 btnMessage.setVisibility("accepted".equals(statusLower) ? View.VISIBLE : View.GONE);
 
                 // Track button - show only for accepted (ongoing) rides
-                if (btnTrack != null) {
-                    btnTrack.setVisibility("accepted".equals(statusLower) ? View.VISIBLE : View.GONE);
-                }
+                btnTrack.setVisibility("accepted".equals(statusLower) ? View.VISIBLE : View.GONE);
+
+                // 🔥 SAFETY BUTTON - SHOW ONLY FOR PASSENGERS ON ACCEPTED RIDES
+                boolean shouldShowSafety = isPassenger && "accepted".equals(statusLower);
+                btnSafety.setVisibility(shouldShowSafety ? View.VISIBLE : View.GONE);
+
+                android.util.Log.e("SAFETY_TEST", "Safety button visibility set to: " +
+                        (shouldShowSafety ? "VISIBLE" : "GONE"));
             }
         }
     }
