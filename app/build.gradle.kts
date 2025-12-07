@@ -72,4 +72,10 @@ dependencies {
 
     // Circular ImageView
     implementation("de.hdodenhof:circleimageview:3.1.0")
+    // Lottie Animation
+    implementation("com.airbnb.android:lottie:6.1.0")
+    // Material Components
+
+    implementation("androidx.activity:activity:1.7.0")
+    implementation("androidx.fragment:fragment:1.5.7")
 }
