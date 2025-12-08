@@ -1,6 +1,8 @@
 package com.example.ridesharing;
 
 import android.app.DatePickerDialog;
+import android.animation.ObjectAnimator;
+import android.view.MotionEvent;
 import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.os.Bundle;
@@ -91,6 +93,8 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         setupMap();
         setupAutocomplete();
         setupClickListeners();
+        setupCardAnimations(); // ADD THIS LINE
+
 
         try {
             BottomNavigationHelper.setupBottomNavigation(this, "POST");
@@ -289,6 +293,42 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
             }
         });
     }
+    private void setupCardAnimations() {
+        // Apply animations to all cards
+        applyCardAnimation(findViewById(R.id.card_route_preview));
+    }
+
+    private void applyCardAnimation(View card) {
+        if (card == null) return;
+
+        card.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        ObjectAnimator scaleDownX = ObjectAnimator.ofFloat(v, "scaleX", 0.97f);
+                        ObjectAnimator scaleDownY = ObjectAnimator.ofFloat(v, "scaleY", 0.97f);
+                        scaleDownX.setDuration(120);
+                        scaleDownY.setDuration(120);
+                        scaleDownX.start();
+                        scaleDownY.start();
+                        break;
+
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        ObjectAnimator scaleUpX = ObjectAnimator.ofFloat(v, "scaleX", 1f);
+                        ObjectAnimator scaleUpY = ObjectAnimator.ofFloat(v, "scaleY", 1f);
+                        scaleUpX.setDuration(200);
+                        scaleUpY.setDuration(200);
+                        scaleUpX.start();
+                        scaleUpY.start();
+                        break;
+                }
+                return false;
+            }
+        });
+    }
+
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
@@ -700,11 +740,10 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
         boolean isComplete = pickupSelected && dropSelected && fareEntered && timeSelected && vehicleSelected;
 
         btnCheckFare.setEnabled(isComplete);
-        btnCheckFare.setBackgroundColor(isComplete ?
-                getResources().getColor(android.R.color.holo_blue_dark) :
-                getResources().getColor(android.R.color.darker_gray));
+        btnCheckFare.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                isComplete ? getResources().getColor(android.R.color.holo_blue_dark) :
+                        getResources().getColor(android.R.color.darker_gray)));
     }
-
     private void checkFareFairness() {
         // Disable button and show analyzing state
         btnCheckFare.setText("Analyzing...");
@@ -1099,7 +1138,8 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
 
     private void enablePostButton() {
         btnPostRequest.setEnabled(true);
-        btnPostRequest.setBackgroundColor(getResources().getColor(android.R.color.holo_green_dark));
+        btnPostRequest.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                getResources().getColor(android.R.color.holo_green_dark)));
     }
 
     private void disablePostButton() {
