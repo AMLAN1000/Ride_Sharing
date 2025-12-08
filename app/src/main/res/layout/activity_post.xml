@@ -6,373 +6,367 @@
     android:id="@+id/main_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FAFAFA"
+    android:background="#F8F9FF"
+    android:paddingTop="24dp"
     tools:context=".PostActivity">
 
-    <!-- Header Section -->
-    <LinearLayout
-        android:id="@+id/header_layout"
+    <!-- Expanded Header Card with Wave Cutout -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/header_card"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="24dp"
-        android:paddingTop="32dp"
-        android:background="#FFFFFF"
-        android:gravity="center_vertical"
-        android:elevation="2dp"
+        android:layout_height="200dp"
+        android:layout_marginStart="0dp"
+        android:layout_marginTop="0dp"
+        android:layout_marginEnd="0dp"
+        app:cardBackgroundColor="#FFFFFF"
+        app:cardCornerRadius="0dp"
+        app:cardElevation="10dp"
+        android:clipToPadding="false"
+        android:clipChildren="false"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- 3D Effect Background -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <!-- Gradient Background -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/header_gradient" />
+
+            <!-- Wavy Bottom Shape -->
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:layout_alignParentBottom="true"
+                android:src="@drawable/wave_bottom_shape"
+                android:scaleType="fitXY"
+                android:alpha="0.1" />
+
+            <!-- Wave Cutout Overlay -->
+            <ImageView
+                android:id="@+id/wave_cutout"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_alignParentBottom="true"
+                android:layout_marginBottom="-30dp"
+                android:src="@drawable/wave_cutout_shape"
+                android:scaleType="fitXY"
+                app:tint="#FFFFFF" />
+
+            <!-- Animated Car -->
+            <com.airbnb.lottie.LottieAnimationView
+                android:id="@+id/car_animation"
+                android:layout_width="350dp"
+                android:layout_height="200dp"
+                android:layout_alignParentEnd="true"
+                android:layout_alignParentBottom="true"
+                android:layout_marginBottom="10dp"
+                app:lottie_rawRes="@raw/car1"
+                app:lottie_autoPlay="true"
+                app:lottie_loop="true"
+                app:lottie_speed="0.9" />
+
+            <!-- User Info Section -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="28dp"
+                android:layout_marginTop="50dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/greeting_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="WHAT TO POST?"
+                    android:textColor="#8A6BC9"
+                    android:textSize="20dp"
+                    android:textAllCaps="true"
+                    android:letterSpacing="0.15"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/username_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="John"
+                    android:textColor="#2D2D5B"
+                    android:textSize="32sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="-0.03" />
+
+            </LinearLayout>
+
+        </RelativeLayout>
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- Main Content Cards in Vertical Layout -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/main_scroll_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="200dp"
+        android:overScrollMode="never"
+        android:fadingEdgeLength="0dp"
+        app:layout_constraintBottom_toTopOf="@+id/bottom_navigation"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:alpha="0.8"
-                android:text="Welcome"
-                android:textColor="#424242"
-                android:textSize="16sp" />
-
-            <TextView
-                android:id="@+id/username_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="John Doe"
-                android:textColor="#212121"
-                android:textSize="24sp"
-                android:textStyle="bold" />
-
-        </LinearLayout>
-
-        <ImageView
-            android:id="@+id/profile_avatar"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="16dp"
-            android:padding="12dp"
-            android:src="@android:drawable/ic_menu_myplaces"
-            app:tint="#2196F3" />
-
-    </LinearLayout>
-
-    <!-- Welcome Section -->
-    <TextView
-        android:id="@+id/welcome_text"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginEnd="24dp"
-        android:text="What would you like to post today?"
-        android:textColor="#424242"
-        android:textSize="18sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/header_layout" />
-
-    <!-- Main Content Cards -->
-    <androidx.core.widget.NestedScrollView
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:padding="24dp"
-        android:paddingTop="18dp"
-        app:layout_constraintBottom_toTopOf="@+id/bottom_navigation"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/welcome_text">
-
-        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:padding="24dp">
 
-            <!-- First Row of Cards -->
-            <LinearLayout
+            <!-- Card 1: Post Request -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/post_request_card"
                 android:layout_width="match_parent"
-                android:layout_height="164dp"
-                android:layout_marginBottom="30dp"
-                android:orientation="horizontal">
-                <!-- Post Carpool Card -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/post_carpool_card"
-                    android:layout_width="0dp"
-                    android:layout_height="150dp"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    app:cardBackgroundColor="#FFFFFF"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="4dp">
-
-                    <RelativeLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:padding="16dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_centerInParent="true"
-                            android:gravity="center"
-                            android:orientation="vertical">
-
-                            <ImageView
-                                android:layout_width="48dp"
-                                android:layout_height="48dp"
-                                android:layout_marginBottom="12dp"
-                                android:src="@android:drawable/ic_menu_compass"
-                                app:tint="#FF9800" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginBottom="4dp"
-                                android:text="Post Carpool"
-                                android:textAlignment="center"
-                                android:textColor="#212121"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Offer shared ride split fare"
-                                android:textAlignment="center"
-                                android:textColor="#757575"
-                                android:textSize="12sp" />
-                        </LinearLayout>
-
-                        <View
-                            android:id="@+id/btn_post_carpool"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:background="?android:attr/selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true" />
-                    </RelativeLayout>
-
-                </androidx.cardview.widget.CardView>
-
-
-                <!-- Post Request Card -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/post_request_card"
-                    android:layout_width="0dp"
-                    android:layout_height="150dp"
-                    android:layout_marginEnd="12dp"
-                    android:layout_weight="1"
-                    app:cardBackgroundColor="#FFFFFF"
-                    app:cardCornerRadius="18dp"
-                    app:cardElevation="6dp">
-
-                    <RelativeLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="150dp"
-                        android:padding="16dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_centerInParent="true"
-                            android:gravity="center"
-                            android:orientation="vertical">
-
-                            <ImageView
-                                android:layout_width="48dp"
-                                android:layout_height="48dp"
-                                android:layout_marginBottom="12dp"
-                                android:src="@android:drawable/ic_menu_help"
-                                app:tint="#4CAF50" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginBottom="4dp"
-                                android:text="Post a Request"
-                                android:textAlignment="center"
-                                android:textColor="#212121"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Request a ride as passenger"
-                                android:textAlignment="center"
-                                android:textColor="#757575"
-                                android:textSize="12sp" />
-
-                        </LinearLayout>
-
-                        <View
-                            android:id="@+id/btn_post_request"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:background="?android:attr/selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true" />
-
-                    </RelativeLayout>
-
-                </androidx.cardview.widget.CardView>
-
-                <!-- Post Ride Card -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/post_ride_card"
-                    android:layout_width="0dp"
-                    android:layout_height="150dp"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    app:cardBackgroundColor="#FFFFFF"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="4dp">
-
-                    <RelativeLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:padding="16dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_centerInParent="true"
-                            android:gravity="center"
-                            android:orientation="vertical">
-
-                            <ImageView
-                                android:layout_width="48dp"
-                                android:layout_height="48dp"
-                                android:layout_marginBottom="12dp"
-                                android:src="@android:drawable/ic_menu_directions"
-                                app:tint="#2196F3" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginBottom="4dp"
-                                android:text="Post a Ride"
-                                android:textAlignment="center"
-                                android:textColor="#212121"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Offer a ride as driver"
-                                android:textAlignment="center"
-                                android:textColor="#757575"
-                                android:textSize="12sp" />
-
-                        </LinearLayout>
-
-                        <View
-                            android:id="@+id/btn_post_ride"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:background="?android:attr/selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true" />
-
-                    </RelativeLayout>
-
-                </androidx.cardview.widget.CardView>
-
-            </LinearLayout>
-
-            <!-- Quick Actions Section Header -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
-                android:text="How it works"
-                android:textColor="#424242"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <!-- Info Cards -->
-            <androidx.cardview.widget.CardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="100dp"
                 android:layout_marginBottom="16dp"
                 app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp">
+                app:cardCornerRadius="24dp"
+                app:cardElevation="8dp"
+                android:stateListAnimator="@null">
 
-                <LinearLayout
+                <RelativeLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="20dp">
+                    android:layout_height="match_parent"
+                    android:padding="10dp">
 
-                    <TextView
+                    <!-- Animation Container on LEFT -->
+                    <FrameLayout
+                        android:id="@+id/animation_container_request"
+                        android:layout_width="80dp"
+                        android:layout_height="match_parent"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true">
+
+                        <!-- Lottie Animation -->
+                        <com.airbnb.lottie.LottieAnimationView
+                            android:id="@+id/request_animation"
+                            android:layout_width="70dp"
+                            android:layout_height="70dp"
+                            android:layout_gravity="center"
+                            app:lottie_rawRes="@raw/riderequest"
+                            app:lottie_autoPlay="true"
+                            app:lottie_loop="true"
+                            app:lottie_speed="1.0"/>
+
+                    </FrameLayout>
+
+                    <!-- Text Content on RIGHT -->
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Post a Request"
-                        android:textColor="#212121"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:drawableStart="@android:drawable/ic_menu_help"
-                        android:drawablePadding="8dp"
-                        android:drawableTint="#4CAF50"
-                        android:gravity="center_vertical" />
+                        android:layout_toEndOf="@id/animation_container_request"
+                        android:layout_centerVertical="true"
+                        android:orientation="vertical"
+                        android:paddingStart="16dp">
 
-                    <TextView
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Post a Request"
+                            android:textColor="#2D2D5B"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="Request a ride as passenger"
+                            android:textColor="#8A8AA3"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <!-- Clickable Area -->
+                    <View
+                        android:id="@+id/btn_post_request"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="• Request a ride as a passenger\n• Set your pickup and drop-off locations\n• Specify your preferred time and budget\n• Wait for drivers to accept your request"
-                        android:textColor="#757575"
-                        android:textSize="12sp"
-                        android:lineSpacingExtra="4dp" />
+                        android:layout_height="match_parent"
+                        android:background="?android:attr/selectableItemBackground" />
 
-                </LinearLayout>
+                </RelativeLayout>
 
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
 
-            <androidx.cardview.widget.CardView
+            <!-- Card 2: Post Ride -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/post_ride_card"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="100dp"
                 android:layout_marginBottom="16dp"
                 app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp">
+                app:cardCornerRadius="24dp"
+                app:cardElevation="8dp"
+                android:stateListAnimator="@null">
 
-                <LinearLayout
+                <RelativeLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
+                    android:layout_height="match_parent"
                     android:padding="20dp">
 
-                    <TextView
+                    <!-- Animation Container on LEFT -->
+                    <FrameLayout
+                        android:id="@+id/animation_container_ride"
+                        android:layout_width="80dp"
+                        android:layout_height="match_parent"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true">
+
+                        <!-- Background circle for animation -->
+                        <View
+                            android:layout_width="70dp"
+                            android:layout_height="70dp"
+                            android:layout_gravity="center"
+                            android:background="#E8F0FF"
+                            android:alpha="0.3"
+                            android:shape="oval" />
+
+                        <!-- Ride Animation -->
+                        <com.airbnb.lottie.LottieAnimationView
+                            android:id="@+id/ride_animation"
+                            android:layout_width="70dp"
+                            android:layout_height="70dp"
+                            android:layout_gravity="center"
+                            app:lottie_rawRes="@raw/rides"
+                            app:lottie_autoPlay="true"
+                            app:lottie_loop="true"
+                            app:lottie_speed="1.0" />
+
+                    </FrameLayout>
+
+                    <!-- Text Content on RIGHT -->
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Post a Ride"
-                        android:textColor="#212121"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:drawableStart="@android:drawable/ic_menu_directions"
-                        android:drawablePadding="8dp"
-                        android:drawableTint="#2196F3"
-                        android:gravity="center_vertical" />
+                        android:layout_toEndOf="@id/animation_container_ride"
+                        android:layout_centerVertical="true"
+                        android:orientation="vertical"
+                        android:paddingStart="16dp">
 
-                    <TextView
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Post a Ride"
+                            android:textColor="#2D2D5B"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="Offer a ride as driver"
+                            android:textColor="#8A8AA3"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <!-- Clickable Area -->
+                    <View
+                        android:id="@+id/btn_post_ride"
                         android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="?android:attr/selectableItemBackground" />
+
+                </RelativeLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Card 3: Post Carpool -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/post_carpool_card"
+                android:layout_width="match_parent"
+                android:layout_height="100dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="8dp"
+                android:stateListAnimator="@null">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="20dp">
+
+                    <!-- Animation Container on LEFT -->
+                    <FrameLayout
+                        android:id="@+id/animation_container_carpool"
+                        android:layout_width="80dp"
+                        android:layout_height="match_parent"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true">
+
+                        <!-- Background circle for animation -->
+                        <View
+                            android:layout_width="70dp"
+                            android:layout_height="70dp"
+                            android:layout_gravity="center"
+                            android:background="#FFEBF0"
+                            android:alpha="0.3"
+                            android:shape="oval" />
+
+                        <!-- Carpool Animation -->
+                        <com.airbnb.lottie.LottieAnimationView
+                            android:id="@+id/carpool_animation"
+                            android:layout_width="70dp"
+                            android:layout_height="70dp"
+                            android:layout_gravity="center"
+                            app:lottie_rawRes="@raw/peoplecar"
+                            app:lottie_autoPlay="true"
+                            app:lottie_loop="true"
+                            app:lottie_speed="1.0" />
+
+                    </FrameLayout>
+
+                    <!-- Text Content on RIGHT -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="• Offer a ride as a driver\n• Set your route and available seats\n• Specify departure time and fare\n• Passengers can request to join your ride"
-                        android:textColor="#757575"
-                        android:textSize="12sp"
-                        android:lineSpacingExtra="4dp" />
+                        android:layout_toEndOf="@id/animation_container_carpool"
+                        android:layout_centerVertical="true"
+                        android:orientation="vertical"
+                        android:paddingStart="16dp">
 
-                </LinearLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Post Carpool"
+                            android:textColor="#2D2D5B"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
 
-            </androidx.cardview.widget.CardView>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="Offer shared ride and split fare"
+                            android:textColor="#8A8AA3"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <!-- Clickable Area -->
+                    <View
+                        android:id="@+id/btn_post_carpool"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="?android:attr/selectableItemBackground" />
+
+                </RelativeLayout>
+
+            </com.google.android.material.card.MaterialCardView>
 
         </LinearLayout>
 
