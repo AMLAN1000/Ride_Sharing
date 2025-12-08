@@ -25,7 +25,7 @@ public class ProfileActivity extends AppCompatActivity {
 
     private TextView profileName, profileEmail, profilePhone, profileJoinDate;
     private TextView totalRides, userRating;
-    private ImageView btnEdit, btnUploadDp;
+    private ImageView btnEdit;
     private de.hdodenhof.circleimageview.CircleImageView profileImage;
 
     private FirebaseAuth mAuth;
@@ -79,7 +79,6 @@ public class ProfileActivity extends AppCompatActivity {
 
         // Button views
         btnEdit = findViewById(R.id.btn_edit);
-        btnUploadDp = findViewById(R.id.btn_upload_dp);
 
         // Profile image view
         profileImage = findViewById(R.id.profile_image);
@@ -177,10 +176,6 @@ public class ProfileActivity extends AppCompatActivity {
             showEditPhoneDialog();
         });
 
-        // Upload profile picture button
-        btnUploadDp.setOnClickListener(v -> {
-            openImagePicker();
-        });
 
         // Edit profile menu item - NOW OPENS PHONE DIALOG
         findViewById(R.id.btn_edit_profile).setOnClickListener(v -> {

@@ -3,9 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white">
+    android:background="#F8F9FF">
 
-    <!-- 1. FIXED BOTTOM NAVIGATION BAR (FOOTER) -->
     <include
         android:id="@+id/bottom_navigation"
         layout="@layout/activity_layout_bottom_navigation"
@@ -13,135 +12,203 @@
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true" />
 
-    <!-- 2. MAIN CONTENT AREA (Header + Scrollable Body) -->
-    <!-- This LinearLayout fills all space above the bottom navigation bar. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:layout_above="@id/bottom_navigation"> <!-- KEY FIX: Stops content exactly above the footer -->
+        android:layout_above="@id/bottom_navigation">
 
-        <!-- A. Header Section (Fixed Height) -->
-        <LinearLayout
+        <androidx.cardview.widget.CardView
+            android:id="@+id/header_card_styled"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@color/blue"
-            android:orientation="vertical"
-            android:padding="16dp">
+            android:layout_height="220dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            app:cardBackgroundColor="#FFFFFF"
+            app:cardCornerRadius="0dp"
+            app:cardElevation="10dp">
 
             <RelativeLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="match_parent">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="My Rides"
-                    android:textColor="@android:color/white"
-                    android:textSize="24sp"
-                    android:textStyle="bold"
-                    android:layout_centerVertical="true" />
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/header_gradient" />
 
                 <ImageView
-                    android:id="@+id/btn_close"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_alignParentEnd="true"
-                    android:src="@android:drawable/ic_menu_close_clear_cancel"
-                    android:tint="@android:color/white"
-                    android:padding="4dp"
-                    android:background="?attr/selectableItemBackgroundBorderless" />
+                    android:layout_width="match_parent"
+                    android:layout_height="80dp"
+                    android:layout_alignParentBottom="true"
+                    android:alpha="0.1"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/wave_bottom_shape" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:layout_alignParentBottom="true"
+                    android:layout_marginBottom="-1dp"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/wave_cutout_shape"
+                    app:tint="#FFFFFF" />
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="50dp"
+                    android:paddingStart="28dp"
+                    android:paddingEnd="28dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="My Rides"
+                        android:textColor="#2D2D5B"
+                        android:textSize="32sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="-0.03"
+                        android:layout_centerVertical="true" />
+
+                    <ImageView
+                        android:id="@+id/btn_close"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_alignParentEnd="true"
+                        android:src="@android:drawable/ic_menu_close_clear_cancel"
+                        android:padding="12dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:tint="#8A6BC9" />
+
+                </RelativeLayout>
+
+                <!-- Tab Selector Container -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_alignParentBottom="true"
+                    android:layout_marginBottom="30dp"
+                    android:paddingStart="40dp"
+                    android:paddingEnd="40dp">
+
+                    <!-- Passenger Tab -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/tab_passenger_card"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        app:cardBackgroundColor="#8A6BC9"
+                        app:cardCornerRadius="24dp"
+                        app:cardElevation="4dp"
+                        app:rippleColor="#7A5BC9"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground">
+
+                        <TextView
+                            android:id="@+id/tab_as_passenger"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:text="As Passenger"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:gravity="center" />
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Driver Tab -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/tab_driver_card"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        app:cardBackgroundColor="#FFFFFF"
+                        app:cardCornerRadius="24dp"
+                        app:cardElevation="4dp"
+                        app:rippleColor="#F0F4FF"
+                        app:strokeColor="#E0E0E0"
+                        app:strokeWidth="1.5dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground">
+
+                        <TextView
+                            android:id="@+id/tab_as_driver"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:text="As Driver"
+                            android:textColor="#8A8AA3"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:gravity="center" />
+                    </com.google.android.material.card.MaterialCardView>
+
+                </LinearLayout>
 
             </RelativeLayout>
+        </androidx.cardview.widget.CardView>
 
-            <!-- Tab Switcher -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/tab_background"
-                android:padding="4dp">
-
-                <TextView
-                    android:id="@+id/tab_as_passenger"
-                    android:layout_width="0dp"
-                    android:layout_height="40dp"
-                    android:layout_weight="1"
-                    android:text="As Passenger"
-                    android:gravity="center"
-                    android:textColor="@android:color/white"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/tab_selected_background"
-                    android:clickable="true"
-                    android:focusable="true" />
-
-                <TextView
-                    android:id="@+id/tab_as_driver"
-                    android:layout_width="0dp"
-                    android:layout_height="40dp"
-                    android:layout_weight="1"
-                    android:text="As Driver"
-                    android:gravity="center"
-                    android:textColor="@android:color/darker_gray"
-                    android:textSize="14sp"
-                    android:background="@drawable/tab_unselected_background"
-                    android:clickable="true"
-                    android:focusable="true" />
-
-            </LinearLayout>
-
-        </LinearLayout>
-
-        <!-- B. Content Area (Scrollable body, takes up remaining space) -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"> <!-- KEY FIX: Uses weight to fill the remaining vertical space -->
+            android:layout_weight="1"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="24dp"
+            android:paddingBottom="24dp">
 
-            <!-- Loading Progress Bar -->
             <ProgressBar
                 android:id="@+id/progress_bar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:visibility="gone" />
+                android:visibility="gone"
+                android:indeterminateTint="#8A6BC9" />
 
-            <!-- Rides RecyclerView -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recycler_my_rides"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="8dp"
                 android:clipToPadding="false" />
 
-            <!-- Empty State -->
             <LinearLayout
                 android:id="@+id/empty_state_layout"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:padding="32dp"
                 android:visibility="gone">
 
                 <ImageView
                     android:layout_width="120dp"
                     android:layout_height="120dp"
                     android:src="@android:drawable/ic_menu_mylocation"
-                    android:tint="@color/gray"
-                    android:alpha="0.3" />
+                    app:tint="#D0DFFF"
+                    android:alpha="0.8" />
 
                 <TextView
                     android:id="@+id/empty_state_text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="No rides yet"
-                    android:textSize="16sp"
-                    android:textColor="@color/gray"
+                    android:textSize="18sp"
+                    android:textColor="#8A8AA3"
+                    android:textStyle="bold"
                     android:textAlignment="center"
                     android:layout_marginTop="16dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Your ride history will appear here"
+                    android:textColor="#8A8AA3"
+                    android:textSize="14sp"
+                    android:layout_marginTop="8dp"
+                    android:textAlignment="center" />
 
             </LinearLayout>
 
