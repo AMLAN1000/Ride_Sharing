@@ -1,6 +1,7 @@
 package com.example.ridesharing;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
@@ -10,15 +11,16 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.card.MaterialCardView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -32,6 +34,7 @@ public class MyRidesActivity extends AppCompatActivity {
     private static final String TAG = "MyRidesActivity";
 
     private TextView tabAsPassenger, tabAsDriver;
+    private MaterialCardView tabPassengerCard, tabDriverCard;
     private RecyclerView recyclerView;
     private ProgressBar progressBar;
     private View emptyStateLayout;
@@ -103,6 +106,8 @@ public class MyRidesActivity extends AppCompatActivity {
     private void initializeViews() {
         tabAsPassenger = findViewById(R.id.tab_as_passenger);
         tabAsDriver = findViewById(R.id.tab_as_driver);
+        tabPassengerCard = findViewById(R.id.tab_passenger_card);
+        tabDriverCard = findViewById(R.id.tab_driver_card);
         recyclerView = findViewById(R.id.recycler_my_rides);
         progressBar = findViewById(R.id.progress_bar);
         emptyStateLayout = findViewById(R.id.empty_state_layout);
@@ -163,6 +168,14 @@ public class MyRidesActivity extends AppCompatActivity {
     }
 
     private void setupClickListeners() {
+        if (tabPassengerCard != null) {
+            tabPassengerCard.setOnClickListener(v -> switchToPassengerTab());
+        }
+        if (tabDriverCard != null) {
+            tabDriverCard.setOnClickListener(v -> switchToDriverTab());
+        }
+
+        // Also keep the TextViews clickable for backward compatibility
         tabAsPassenger.setOnClickListener(v -> switchToPassengerTab());
         tabAsDriver.setOnClickListener(v -> switchToDriverTab());
     }
@@ -173,6 +186,9 @@ public class MyRidesActivity extends AppCompatActivity {
         showingPassengerRides = true;
         updateTabUI();
         loadPassengerRides();
+
+        // Add animation
+        animateTabSelection(tabPassengerCard, true);
     }
 
     private void switchToDriverTab() {
@@ -181,19 +197,57 @@ public class MyRidesActivity extends AppCompatActivity {
         showingPassengerRides = false;
         updateTabUI();
         loadDriverRides();
+
+        // Add animation
+        animateTabSelection(tabDriverCard, false);
+    }
+
+    private void animateTabSelection(MaterialCardView selectedCard, boolean isPassenger) {
+        selectedCard.animate()
+                .scaleX(0.98f)
+                .scaleY(0.98f)
+                .setDuration(100)
+                .withEndAction(() -> {
+                    selectedCard.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(100)
+                            .start();
+                })
+                .start();
     }
 
     private void updateTabUI() {
         if (showingPassengerRides) {
-            tabAsPassenger.setTextColor(getResources().getColor(android.R.color.white));
-            tabAsPassenger.setBackgroundResource(R.drawable.tab_selected_background);
-            tabAsDriver.setTextColor(getResources().getColor(android.R.color.darker_gray));
-            tabAsDriver.setBackgroundResource(R.drawable.tab_unselected_background);
+            // Passenger tab selected
+            if (tabPassengerCard != null) {
+                tabPassengerCard.setCardBackgroundColor(ContextCompat.getColor(this, R.color.purple_primary));
+                tabPassengerCard.setStrokeWidth(0);
+                tabPassengerCard.setStrokeColor(Color.TRANSPARENT);
+            }
+            if (tabDriverCard != null) {
+                tabDriverCard.setCardBackgroundColor(Color.WHITE);
+                tabDriverCard.setStrokeWidth(2);
+                tabDriverCard.setStrokeColor(Color.parseColor("#E0E0E0"));
+            }
+
+            tabAsPassenger.setTextColor(Color.WHITE);
+            tabAsDriver.setTextColor(Color.parseColor("#8A8AA3"));
         } else {
-            tabAsDriver.setTextColor(getResources().getColor(android.R.color.white));
-            tabAsDriver.setBackgroundResource(R.drawable.tab_selected_background);
-            tabAsPassenger.setTextColor(getResources().getColor(android.R.color.darker_gray));
-            tabAsPassenger.setBackgroundResource(R.drawable.tab_unselected_background);
+            // Driver tab selected
+            if (tabDriverCard != null) {
+                tabDriverCard.setCardBackgroundColor(ContextCompat.getColor(this, R.color.purple_primary));
+                tabDriverCard.setStrokeWidth(0);
+                tabDriverCard.setStrokeColor(Color.TRANSPARENT);
+            }
+            if (tabPassengerCard != null) {
+                tabPassengerCard.setCardBackgroundColor(Color.WHITE);
+                tabPassengerCard.setStrokeWidth(2);
+                tabPassengerCard.setStrokeColor(Color.parseColor("#E0E0E0"));
+            }
+
+            tabAsDriver.setTextColor(Color.WHITE);
+            tabAsPassenger.setTextColor(Color.parseColor("#8A8AA3"));
         }
     }
 
@@ -603,7 +657,13 @@ public class MyRidesActivity extends AppCompatActivity {
     }
 
     private void completeRide(MyRideItem ride) {
-        String currentUserId = mAuth.getCurrentUser().getUid();
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) {
+            Toast.makeText(this, "Please login first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String currentUserId = currentUser.getUid();
 
         // Safety check: Ensure the current user is the driver
         if (showingPassengerRides) {
@@ -902,4 +962,3 @@ public class MyRidesActivity extends AppCompatActivity {
         }
     }
 }
-

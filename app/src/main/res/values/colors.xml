@@ -1,43 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Primary Blue Colors -->
     <color name="primary_blue">#2196F3</color>
     <color name="primary_blue_dark">#1976D2</color>
     <color name="primary_blue_light">#E3F2FD</color>
     <color name="primary_blue_lighter">#BBDEFB</color>
 
-    <!-- White and Gray Scale -->
     <color name="white">#FFFFFF</color>
     <color name="light_gray">#FAFAFA</color>
     <color name="medium_gray">#9E9E9E</color>
     <color name="dark_gray">#424242</color>
     <color name="divider_gray">#E0E0E0</color>
 
-    <!-- Professional Text Colors -->
     <color name="text_primary">#212121</color>
     <color name="text_secondary">#424242</color>
     <color name="text_hint">#757575</color>
     <color name="text_disabled">#BDBDBD</color>
     <color name="text_on_primary">#FFFFFF</color>
 
-    <!-- Background Colors -->
     <color name="background_primary">#FFFFFF</color>
     <color name="background_secondary">#FAFAFA</color>
     <color name="card_background">#FFFFFF</color>
     <color name="surface_color">#FFFFFF</color>
 
-    <!-- State Colors -->
     <color name="selected_blue">#2196F3</color>
     <color name="unselected_gray">#9E9E9E</color>
     <color name="success_green">#4CAF50</color>
     <color name="warning_orange">#FF9800</color>
     <color name="error_red">#F44336</color>
 
-    <!-- Accent Colors -->
     <color name="accent_teal">#03DAC5</color>
     <color name="ripple_color">#E1F5FE</color>
 
-    <!-- FIXED: Replace color names with hex codes -->
+    <color name="purple_primary">#8A6BC9</color>
+    <color name="purple_dark">#7A5BC9</color>
+    <color name="gray_light">#8A8AA3</color>
+    <color name="background_light">#F0F4FF</color>
+    <color name="blue_primary">#6B8CFF</color>
+    <color name="pink_primary">#FF6B9D</color>
+    <color name="red_primary">#FF6B6B</color>
+    <color name="green_primary">#4CAF50</color>
+
     <color name="gray">#9E9E9E</color>
     <color name="blue">#2196F3</color>
 </resources>
