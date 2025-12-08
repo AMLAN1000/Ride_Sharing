@@ -7,13 +7,17 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
+import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.airbnb.lottie.LottieAnimationView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
@@ -45,6 +49,8 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
     private FirebaseAuth mAuth;
     private ListenerRegistration ridesListener;
     private boolean isLoading = false;
+    private LottieAnimationView carAnimation;
+    private CardView headerCard;
 
     // Search State
     private boolean isSearchActive = false;
@@ -60,10 +66,44 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
         initializeViews();
         setupRecyclerView();
         setupSearchFunctionality();
+        setupScrollListener();
         loadAvailableRides();
         ExpiredRequestsCleaner.cleanExpiredPendingRequests();
 
         BottomNavigationHelper.setupBottomNavigation(this, "RIDES");
+    }
+
+    private void setupScrollListener() {
+        NestedScrollView scrollView = findViewById(R.id.main_scroll_view);
+
+        if (scrollView == null || headerCard == null) {
+            return;
+        }
+
+        scrollView.setOnScrollChangeListener(new NestedScrollView.OnScrollChangeListener() {
+            private final int initialHeaderHeight = 180;
+
+            @Override
+            public void onScrollChange(NestedScrollView v, int scrollX, int scrollY, int oldScrollX, int oldScrollY) {
+                float shrinkFactor = Math.min(1.0f, scrollY / 100f);
+                int newHeight = (int) (initialHeaderHeight - (shrinkFactor * 30));
+
+                ViewGroup.LayoutParams params = headerCard.getLayoutParams();
+                params.height = dpToPx(newHeight);
+                headerCard.setLayoutParams(params);
+
+                if (carAnimation != null) {
+                    float carScale = 1.0f - (shrinkFactor * 0.2f);
+                    carAnimation.setScaleX(carScale);
+                    carAnimation.setScaleY(carScale);
+                }
+            }
+        });
+    }
+
+    private int dpToPx(int dp) {
+        float density = getResources().getDisplayMetrics().density;
+        return Math.round(dp * density);
     }
 
     private void initializeFirebase() {
@@ -82,9 +122,19 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
         ridesCountText = findViewById(R.id.rides_count_text);
         subtitleText = findViewById(R.id.subtitle_text);
         filterButton = findViewById(R.id.filter_button);
+        carAnimation = findViewById(R.id.car_animation);
+        headerCard = findViewById(R.id.header_card);
 
         if (filterButton != null) {
             filterButton.setOnClickListener(v -> toggleSearchPanel());
+        }
+
+        View btnRefresh = findViewById(R.id.btn_refresh);
+        if (btnRefresh != null) {
+            btnRefresh.setOnClickListener(v -> {
+                loadAvailableRides();
+                Toast.makeText(this, "Refreshing...", Toast.LENGTH_SHORT).show();
+            });
         }
     }
 
@@ -251,7 +301,6 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
 
         Log.d(TAG, "Loading driver-posted rides...");
 
-        // Query for driver-posted rides (isDriverPost = true, status = pending)
         ridesListener = db.collection("ride_requests")
                 .whereEqualTo("isDriverPost", true)
                 .whereEqualTo("status", "pending")
@@ -327,7 +376,6 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
             Double distance = document.getDouble("distance");
             Boolean isFareFair = document.getBoolean("isFareFair");
 
-            // Format departure time
             String departureTimeStr = "Now";
             if (departureTime != null) {
                 try {
@@ -338,7 +386,6 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                 }
             }
 
-            // Calculate available seats
             int availableSeats = passengersLong != null ? passengersLong.intValue() : 1;
 
             return new Ride(
@@ -350,7 +397,7 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
                     pickupLocation != null ? pickupLocation : "Pickup",
                     dropLocation != null ? dropLocation : "Drop",
                     departureTimeStr,
-                    "", // arrivalTime
+                    "",
                     fare != null ? fare : 0.0,
                     driverId,
                     driverPhone != null ? driverPhone : "",
@@ -431,7 +478,6 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
 
         String currentUserId = currentUser.getUid();
 
-        // Prevent drivers from accepting their own ride posts
         if (currentUserId.equals(ride.getDriverId())) {
             new androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("Cannot Accept Own Ride")
@@ -551,6 +597,18 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
     protected void onResume() {
         super.onResume();
         BottomNavigationHelper.setupBottomNavigation(this, "RIDES");
+        if (carAnimation != null) {
+            carAnimation.playAnimation();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        hideSearchPanel();
+        if (carAnimation != null) {
+            carAnimation.pauseAnimation();
+        }
     }
 
     @Override
@@ -560,11 +618,5 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
             ridesListener.remove();
             ridesListener = null;
         }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        hideSearchPanel();
     }
 }

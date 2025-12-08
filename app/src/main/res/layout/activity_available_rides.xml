@@ -5,265 +5,340 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FAFAFA"
+    android:background="#F8F9FF"
+    android:paddingTop="24dp"
     tools:context=".AvailableRidesActivity">
 
-    <!-- Header Section -->
-    <LinearLayout
-        android:id="@+id/header_layout"
+    <!-- Expanded Header Card with Wave Cutout -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/header_card"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="24dp"
-        android:paddingTop="32dp"
-        android:background="#FFFFFF"
-        android:gravity="center_vertical"
-        android:elevation="2dp"
+        android:layout_height="180dp"
+        android:layout_marginStart="0dp"
+        android:layout_marginTop="0dp"
+        android:layout_marginEnd="0dp"
+        app:cardBackgroundColor="#FFFFFF"
+        app:cardCornerRadius="0dp"
+        app:cardElevation="10dp"
+        android:clipToPadding="false"
+        android:clipChildren="false"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+        <!-- 3D Effect Background -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
-            <TextView
+            <!-- Gradient Background -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/header_gradient" />
+
+            <!-- Wavy Bottom Shape -->
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:layout_alignParentBottom="true"
+                android:src="@drawable/wave_bottom_shape"
+                android:scaleType="fitXY"
+                android:alpha="0.1" />
+
+            <!-- Wave Cutout Overlay -->
+            <ImageView
+                android:id="@+id/wave_cutout"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_alignParentBottom="true"
+                android:layout_marginBottom="-30dp"
+                android:src="@drawable/wave_cutout_shape"
+                android:scaleType="fitXY"
+                app:tint="#FFFFFF" />
+
+            <!-- Animated Car -->
+
+            <!-- Header Info Section -->
+
+            <com.airbnb.lottie.LottieAnimationView
+                android:id="@+id/car_animation"
+                android:layout_width="250dp"
+                android:layout_height="142dp"
+                android:layout_alignParentEnd="true"
+                android:layout_alignParentBottom="true"
+                android:layout_marginEnd="9dp"
+                android:layout_marginBottom="37dp"
+                app:lottie_autoPlay="true"
+                app:lottie_loop="true"
+                app:lottie_rawRes="@raw/rides"
+                app:lottie_speed="1.0" />
+
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Available"
-                android:textColor="#424242"
-                android:textSize="16sp"
-                android:alpha="0.8" />
+                android:layout_marginStart="28dp"
+                android:layout_marginTop="40dp"
+                android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/rides_count_text"
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="AVAILABLE"
+                    android:textColor="#8A6BC9"
+                    android:textSize="18sp"
+                    android:textAllCaps="true"
+                    android:letterSpacing="0.15"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/rides_count_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Driver Rides"
+                    android:textColor="#2D2D5B"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="-0.03" />
+
+                <TextView
+                    android:id="@+id/subtitle_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Find rides offered by drivers"
+                    android:textColor="#6B5B8C"
+                    android:textSize="13sp"
+                    android:alpha="0.9" />
+
+            </LinearLayout>
+
+            <!-- Filter Button -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/filter_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Driver Rides"
-                android:textColor="#212121"
-                android:textSize="24sp"
-                android:textStyle="bold" />
+                android:layout_alignParentEnd="true"
+                android:layout_marginTop="45dp"
+                android:layout_marginEnd="24dp"
+                android:src="@android:drawable/ic_menu_search"
+                app:tint="@android:color/white"
+                app:fabSize="mini"
+                app:backgroundTint="#8A6BC9"
+                app:elevation="6dp"
+                android:contentDescription="Search rides" />
 
-        </LinearLayout>
+        </RelativeLayout>
 
-        <ImageView
-            android:id="@+id/filter_button"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="16dp"
-            android:padding="12dp"
-            android:src="@android:drawable/ic_menu_search"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:clickable="true"
-            android:focusable="true"
-            app:tint="#4CAF50" />
-
-    </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
     <!-- Search Filter Panel (Initially Hidden) -->
-    <LinearLayout
+    <com.google.android.material.card.MaterialCardView
         android:id="@+id/search_panel"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="#E8F5E9"
-        android:padding="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
         android:visibility="gone"
-        android:elevation="4dp"
+        app:cardBackgroundColor="#FFFFFF"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/header_layout">
+        app:layout_constraintTop_toBottomOf="@id/header_card">
 
-        <!-- From Location -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="12dp">
+            android:orientation="vertical"
+            android:padding="20dp">
 
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_mylocation"
-                android:layout_marginEnd="12dp"
-                app:tint="#4CAF50" />
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@drawable/edittext_background"
+                android:text="🔍 Filter Rides"
+                android:textColor="#2D2D5B"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp" />
+
+            <!-- From Location -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
                 app:boxBackgroundMode="outline"
-                app:boxBackgroundColor="#FFFFFF">
+                app:boxCornerRadiusTopStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxStrokeColor="#8A6BC9"
+                app:hintTextColor="#8A6BC9"
+                app:startIconDrawable="@android:drawable/ic_menu_mylocation"
+                app:startIconTint="#8A6BC9">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_from_location"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="From location"
-                    android:textSize="14sp"
-                    android:background="@android:color/transparent" />
+                    android:textSize="15sp"
+                    android:inputType="text" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
-        </LinearLayout>
-
-        <!-- To Location -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="16dp">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_dialog_map"
-                android:layout_marginEnd="12dp"
-                app:tint="#4CAF50" />
-
+            <!-- To Location -->
             <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@drawable/edittext_background"
+                android:layout_marginBottom="20dp"
                 app:boxBackgroundMode="outline"
-                app:boxBackgroundColor="#FFFFFF">
+                app:boxCornerRadiusTopStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxStrokeColor="#8A6BC9"
+                app:hintTextColor="#8A6BC9"
+                app:startIconDrawable="@android:drawable/ic_dialog_map"
+                app:startIconTint="#8A6BC9">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_to_location"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="To location"
-                    android:textSize="14sp"
-                    android:background="@android:color/transparent" />
+                    android:textSize="15sp"
+                    android:inputType="text" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- Action Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_cancel_search"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:text="Cancel"
+                    android:textColor="#8A6BC9"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="16dp"
+                    app:strokeColor="#8A6BC9"
+                    app:strokeWidth="2dp"
+                    app:backgroundTint="@android:color/transparent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_confirm_search"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="Search"
+                    android:textColor="@android:color/white"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="16dp"
+                    app:backgroundTint="#8A6BC9" />
+
+            </LinearLayout>
+
         </LinearLayout>
 
-        <!-- Action Buttons -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center">
+    </com.google.android.material.card.MaterialCardView>
 
-            <Button
-                android:id="@+id/btn_cancel_search"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:text="Cancel"
-                android:textColor="#4CAF50"
-                android:backgroundTint="#E8F5E9"
-                android:textAllCaps="false" />
-
-            <Button
-                android:id="@+id/btn_confirm_search"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:text="Search"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="#4CAF50"
-                android:textAllCaps="false" />
-
-        </LinearLayout>
-
-    </LinearLayout>
-
-    <!-- Active Filter Chip (Shows when search is active) -->
+    <!-- Active Filter Chip -->
     <com.google.android.material.chip.Chip
         android:id="@+id/chip_active_filter"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="12dp"
         android:text="Filter active"
         android:visibility="gone"
-        app:chipBackgroundColor="#E8F5E9"
+        android:textColor="#8A6BC9"
+        android:textStyle="bold"
+        app:chipBackgroundColor="#F0E6FF"
         app:chipIcon="@android:drawable/ic_menu_search"
-        app:chipIconTint="#4CAF50"
+        app:chipIconTint="#8A6BC9"
+        app:closeIconTint="#8A6BC9"
         app:closeIconVisible="true"
+        app:chipCornerRadius="20dp"
+        app:chipStrokeColor="#C5B3E6"
+        app:chipStrokeWidth="1dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/search_panel" />
 
-    <!-- Subtitle Section -->
-    <TextView
-        android:id="@+id/subtitle_text"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginEnd="24dp"
-        android:text="Find rides offered by drivers"
-        android:textColor="#424242"
-        android:textSize="16sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/chip_active_filter" />
-
-    <!-- Progress Bar -->
-    <ProgressBar
-        android:id="@+id/progress_bar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/subtitle_text" />
-
     <!-- Main Content Area -->
     <androidx.core.widget.NestedScrollView
+        android:id="@+id/main_scroll_view"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:padding="16dp"
+        android:layout_marginTop="180dp"
+        android:overScrollMode="never"
+        android:fadingEdgeLength="0dp"
         app:layout_constraintBottom_toTopOf="@+id/bottom_navigation_include"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/subtitle_text">
+        app:layout_constraintTop_toTopOf="parent">
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="wrap_content"
+            android:padding="16dp">
+
+            <!-- Progress Bar -->
+            <ProgressBar
+                android:id="@+id/progress_bar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="100dp"
+                android:visibility="gone"
+                android:indeterminateTint="#8A6BC9" />
 
             <!-- RecyclerView for Rides -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rides_recyclerview"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" />
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp" />
 
             <!-- Empty State Layout -->
             <LinearLayout
                 android:id="@+id/empty_state_layout"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center"
                 android:visibility="gone"
-                android:padding="32dp">
+                android:padding="40dp"
+                android:layout_marginTop="80dp">
 
-                <ImageView
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:src="@android:drawable/ic_dialog_info"
-                    app:tint="#9E9E9E" />
+                <com.airbnb.lottie.LottieAnimationView
+                    android:layout_width="180dp"
+                    android:layout_height="180dp"
+                    app:lottie_rawRes="@raw/rides"
+                    app:lottie_autoPlay="true"
+                    app:lottie_loop="true"
+                    app:lottie_speed="0.7"
+                    android:alpha="0.6" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="No Rides Available"
-                    android:textColor="#424242"
-                    android:textSize="18sp"
+                    android:textColor="#2D2D5B"
+                    android:textSize="22sp"
                     android:textStyle="bold"
                     android:gravity="center"
                     android:layout_marginTop="16dp" />
@@ -272,22 +347,24 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="When drivers post ride offers, they will appear here for you to request."
-                    android:textColor="#757575"
-                    android:textSize="14sp"
+                    android:textColor="#8A8AA3"
+                    android:textSize="15sp"
                     android:gravity="center"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp" />
 
-                <Button
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_refresh"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Refresh"
-                    android:layout_marginTop="24dp"
-                    android:backgroundTint="#4CAF50"
-                    android:textColor="#FFFFFF"
-                    android:paddingStart="24dp"
-                    android:paddingEnd="24dp" />
+                    android:layout_height="60dp"
+                    android:text="🔄 Refresh"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="28dp"
+                    android:paddingStart="32dp"
+                    android:paddingEnd="32dp"
+                    app:cornerRadius="16dp"
+                    app:backgroundTint="#8A6BC9" />
 
             </LinearLayout>
 
