@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">RideSharing</string>
+    <string name="app_name">BroCar</string>
     <string-array name="relationship_types">
         <item>Family</item>
         <item>Friend</item>

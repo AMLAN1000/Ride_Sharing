@@ -988,7 +988,6 @@ public class MyRidesActivity extends AppCompatActivity {
         android.util.Log.e("SAFETY_TEST", "╚════════════════════════════════════════╝");
         android.util.Log.e("SAFETY_TEST", "");
 
-        Toast.makeText(this, "🔥 openSafety() method called!", Toast.LENGTH_LONG).show();
 
         android.util.Log.e("SAFETY_TEST", "Step 1: Checking if ride is null...");
         if (ride == null) {
@@ -1040,7 +1039,6 @@ public class MyRidesActivity extends AppCompatActivity {
 
         android.util.Log.e("SAFETY_TEST", "Step 7: Starting SafetyActivity...");
         try {
-            Toast.makeText(this, "🚀 Starting SafetyActivity...", Toast.LENGTH_SHORT).show();
             startActivity(intent);
             android.util.Log.e("SAFETY_TEST", "✅✅✅ SafetyActivity started successfully!");
         } catch (Exception e) {
