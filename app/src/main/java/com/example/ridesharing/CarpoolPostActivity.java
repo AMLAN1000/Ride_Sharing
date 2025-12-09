@@ -4,6 +4,8 @@ import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.*;
@@ -81,25 +83,33 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
     // Route management
     private List<RouteStop> routeStops = new ArrayList<>();
     private List<AutocompleteSupportFragment> middleStopFragments = new ArrayList<>();
+    private Map<String, AutocompleteSupportFragment> autocompleteFragments = new HashMap<>();
+
+    // Track if autocomplete is being cleared
+    private boolean isClearingAutocomplete = false;
 
     // RouteStop class
     private static class RouteStop {
         private String address;
         private LatLng latLng;
         private int orderIndex;
+        private String autocompleteFragmentId; // Track which fragment created this stop
 
-        public RouteStop(String address, LatLng latLng, int orderIndex) {
+        public RouteStop(String address, LatLng latLng, int orderIndex, String fragmentId) {
             this.address = address;
             this.latLng = latLng;
             this.orderIndex = orderIndex;
+            this.autocompleteFragmentId = fragmentId;
         }
 
         public String getAddress() { return address; }
         public LatLng getLatLng() { return latLng; }
         public int getOrderIndex() { return orderIndex; }
+        public String getAutocompleteFragmentId() { return autocompleteFragmentId; }
 
         public void setAddress(String address) { this.address = address; }
         public void setLatLng(LatLng latLng) { this.latLng = latLng; }
+        public void setAutocompleteFragmentId(String fragmentId) { this.autocompleteFragmentId = fragmentId; }
     }
 
     @Override
@@ -148,9 +158,6 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
         btnDecreaseSeats = findViewById(R.id.btn_decrease_seats);
         btnIncreaseSeats = findViewById(R.id.btn_increase_seats);
         etSpecialRequest = findViewById(R.id.et_special_request);
-        middleStopsContainer = findViewById(R.id.middle_stops_container);
-        btnAddStop = findViewById(R.id.btn_add_stop);
-        btnRemoveStop = findViewById(R.id.btn_remove_stop);
 
         // Vehicle type selection - Only car for carpool
         radioGroupVehicleType = findViewById(R.id.radio_group_vehicle_type);
@@ -190,75 +197,154 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
         autocompleteStart = (AutocompleteSupportFragment)
                 getSupportFragmentManager().findFragmentById(R.id.autocomplete_start);
         if (autocompleteStart != null) {
-            autocompleteStart.setPlaceFields(Arrays.asList(
-                    Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.ADDRESS
-            ));
-            autocompleteStart.setHint("Starting point");
-            autocompleteStart.setCountries("BD");
-
-            autocompleteStart.setOnPlaceSelectedListener(new PlaceSelectionListener() {
-                @Override
-                public void onPlaceSelected(Place place) {
-                    LatLng latLng = place.getLatLng();
-                    String address = place.getAddress() != null ? place.getAddress() : place.getName();
-
-                    // Update or add start stop
-                    if (routeStops.isEmpty() || routeStops.get(0).getOrderIndex() != 0) {
-                        routeStops.add(0, new RouteStop(address, latLng, 0));
-                    } else {
-                        routeStops.get(0).setAddress(address);
-                        routeStops.get(0).setLatLng(latLng);
-                    }
-
-                    updateMapMarkers();
-                    validateFormCompleteness();
-                }
-
-                @Override
-                public void onError(com.google.android.gms.common.api.Status status) {
-                    Log.e(TAG, "Start point error: " + status);
-                    Toast.makeText(CarpoolPostActivity.this, "Error selecting location", Toast.LENGTH_SHORT).show();
-                }
-            });
+            setupStartAutocomplete(autocompleteStart);
         }
 
         // End Point Autocomplete
         autocompleteEnd = (AutocompleteSupportFragment)
                 getSupportFragmentManager().findFragmentById(R.id.autocomplete_end);
-
         if (autocompleteEnd != null) {
-            autocompleteEnd.setPlaceFields(Arrays.asList(
-                    Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.ADDRESS
-            ));
-            autocompleteEnd.setHint("End point");
-            autocompleteEnd.setCountries("BD");
+            setupEndAutocomplete(autocompleteEnd);
+        }
+    }
 
-            autocompleteEnd.setOnPlaceSelectedListener(new PlaceSelectionListener() {
-                @Override
-                public void onPlaceSelected(Place place) {
-                    LatLng latLng = place.getLatLng();
-                    String address = place.getAddress() != null ? place.getAddress() : place.getName();
+    private void setupStartAutocomplete(AutocompleteSupportFragment fragment) {
+        fragment.setPlaceFields(Arrays.asList(
+                Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.ADDRESS
+        ));
+        fragment.setHint("Starting point");
+        fragment.setCountries("BD");
 
-                    // Always update/add as last stop
-                    int lastIndex = routeStops.size();
-                    RouteStop endStop = new RouteStop(address, latLng, lastIndex);
+        fragment.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+            @Override
+            public void onPlaceSelected(Place place) {
+                if (isClearingAutocomplete) {
+                    return; // Ignore if we're clearing
+                }
 
-                    // Remove old end stop if exists
-                    if (!routeStops.isEmpty() && routeStops.get(routeStops.size() - 1).getOrderIndex() == lastIndex - 1) {
-                        routeStops.remove(routeStops.size() - 1);
+                LatLng latLng = place.getLatLng();
+                String address = place.getAddress() != null ? place.getAddress() : place.getName();
+
+                // Check if start point already exists
+                RouteStop existingStart = null;
+                for (RouteStop stop : routeStops) {
+                    if (stop.getOrderIndex() == 0) {
+                        existingStart = stop;
+                        break;
                     }
-
-                    routeStops.add(endStop);
-                    updateMapMarkers();
-                    validateFormCompleteness();
                 }
 
-                @Override
-                public void onError(com.google.android.gms.common.api.Status status) {
-                    Log.e(TAG, "End point error: " + status);
-                    Toast.makeText(CarpoolPostActivity.this, "Error selecting location", Toast.LENGTH_SHORT).show();
+                if (existingStart != null) {
+                    // Update existing start point
+                    existingStart.setAddress(address);
+                    existingStart.setLatLng(latLng);
+                    existingStart.setAutocompleteFragmentId("start");
+                } else {
+                    // Create new start point
+                    RouteStop newStop = new RouteStop(address, latLng, 0, "start");
+                    routeStops.add(0, newStop);
                 }
-            });
+
+                updateMapMarkers();
+                validateFormCompleteness();
+            }
+
+            @Override
+            public void onError(com.google.android.gms.common.api.Status status) {
+                Log.e(TAG, "Start point error: " + status);
+                Toast.makeText(CarpoolPostActivity.this, "Error selecting location", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Store fragment reference
+        autocompleteFragments.put("start", fragment);
+
+        // Setup text watcher for clearing detection
+        new android.os.Handler().postDelayed(() -> {
+            setupAutocompleteTextWatcher(fragment, "start");
+        }, 200);
+    }
+
+    private void setupEndAutocomplete(AutocompleteSupportFragment fragment) {
+        fragment.setPlaceFields(Arrays.asList(
+                Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.ADDRESS
+        ));
+        fragment.setHint("End point");
+        fragment.setCountries("BD");
+
+        fragment.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+            @Override
+            public void onPlaceSelected(Place place) {
+                if (isClearingAutocomplete) {
+                    return; // Ignore if we're clearing
+                }
+
+                LatLng latLng = place.getLatLng();
+                String address = place.getAddress() != null ? place.getAddress() : place.getName();
+
+                // Find the end point (highest order index or specifically marked)
+                RouteStop existingEnd = null;
+                int maxIndex = -1;
+                for (RouteStop stop : routeStops) {
+                    if (stop.getOrderIndex() > maxIndex) {
+                        maxIndex = stop.getOrderIndex();
+                        existingEnd = stop;
+                    }
+                }
+
+                if (existingEnd != null && existingEnd.getOrderIndex() == maxIndex) {
+                    // Update existing end point
+                    existingEnd.setAddress(address);
+                    existingEnd.setLatLng(latLng);
+                    existingEnd.setAutocompleteFragmentId("end");
+                } else {
+                    // Create new end point
+                    int newIndex = routeStops.isEmpty() ? 1 : maxIndex + 1;
+                    RouteStop newStop = new RouteStop(address, latLng, newIndex, "end");
+                    routeStops.add(newStop);
+                }
+
+                updateMapMarkers();
+                validateFormCompleteness();
+            }
+
+            @Override
+            public void onError(com.google.android.gms.common.api.Status status) {
+                Log.e(TAG, "End point error: " + status);
+                Toast.makeText(CarpoolPostActivity.this, "Error selecting location", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Store fragment reference
+        autocompleteFragments.put("end", fragment);
+
+        // Setup text watcher for clearing detection
+        new android.os.Handler().postDelayed(() -> {
+            setupAutocompleteTextWatcher(fragment, "end");
+        }, 200);
+    }
+
+    private void setupAutocompleteTextWatcher(AutocompleteSupportFragment fragment, String fragmentId) {
+        if (fragment.getView() != null) {
+            EditText editText = fragment.getView().findViewById(
+                    com.google.android.libraries.places.R.id.places_autocomplete_search_input);
+            if (editText != null) {
+                editText.addTextChangedListener(new TextWatcher() {
+                    @Override
+                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+                    @Override
+                    public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+                    @Override
+                    public void afterTextChanged(Editable s) {
+                        if (s.toString().isEmpty() && !isClearingAutocomplete) {
+                            // Text was cleared - remove the associated stop
+                            removeStopByFragmentId(fragmentId);
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -334,55 +420,92 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
 
         // Add autocomplete fragment
         FrameLayout fragmentContainer = new FrameLayout(this);
+        int containerId = View.generateViewId();
+        fragmentContainer.setId(containerId);
+
+        // Use simple ID instead of tag for fragment
+        String fragmentId = "middle_" + (middleStopFragments.size() + 1);
+
         LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 1.0f
         );
         fragmentContainer.setLayoutParams(containerParams);
-        fragmentContainer.setId(View.generateViewId());
         stopLayout.addView(fragmentContainer);
 
         middleStopsContainer.addView(stopLayout);
 
         // Create and add fragment
         AutocompleteSupportFragment fragment = new AutocompleteSupportFragment();
-        getSupportFragmentManager().beginTransaction()
-                .add(fragmentContainer.getId(), fragment)
-                .commit();
 
+        // Commit the fragment transaction immediately
+        getSupportFragmentManager().beginTransaction()
+                .add(containerId, fragment)
+                .commitNow();
+
+        // Now setup the fragment AFTER it's been committed
+        setupMiddleStopFragment(fragment, fragmentId);
+        middleStopFragments.add(fragment);
+        btnRemoveStop.setVisibility(View.VISIBLE);
+
+        Toast.makeText(this, "Middle stop added! Select location", Toast.LENGTH_SHORT).show();
+    }
+
+    private void setupMiddleStopFragment(AutocompleteSupportFragment fragment, String fragmentId) {
         fragment.setPlaceFields(Arrays.asList(
                 Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.ADDRESS
         ));
-        fragment.setHint("Stop " + (middleStopFragments.size() + 1));
+        fragment.setHint("Stop " + (middleStopFragments.size()));
         fragment.setCountries("BD");
 
-        final int stopIndex = middleStopFragments.size() + 1; // +1 because 0 is start
-
+        // Set up place selection listener
         fragment.setOnPlaceSelectedListener(new PlaceSelectionListener() {
             @Override
             public void onPlaceSelected(Place place) {
+                if (isClearingAutocomplete) {
+                    return; // Ignore if we're clearing
+                }
+
                 LatLng latLng = place.getLatLng();
                 String address = place.getAddress() != null ? place.getAddress() : place.getName();
 
-                // Add or update middle stop
-                RouteStop newStop = new RouteStop(address, latLng, stopIndex);
+                // Check if a stop with this fragment already exists
+                RouteStop existingStop = findStopByFragmentId(fragmentId);
 
-                // Find and replace or add
-                boolean found = false;
-                for (int i = 0; i < routeStops.size(); i++) {
-                    if (routeStops.get(i).getOrderIndex() == stopIndex) {
-                        routeStops.set(i, newStop);
-                        found = true;
-                        break;
+                if (existingStop != null) {
+                    // Update existing stop
+                    existingStop.setAddress(address);
+                    existingStop.setLatLng(latLng);
+                } else {
+                    // Find the correct order index for this middle stop
+                    int newOrderIndex = 1; // Start after the pickup (index 0)
+                    for (RouteStop stop : routeStops) {
+                        if (stop.getOrderIndex() >= newOrderIndex) {
+                            newOrderIndex = stop.getOrderIndex() + 1;
+                        }
                     }
-                }
 
-                if (!found) {
-                    // Insert at correct position
-                    int insertPos = stopIndex;
-                    if (insertPos > routeStops.size()) insertPos = routeStops.size();
-                    routeStops.add(insertPos, newStop);
+                    // Adjust if this would be after the end point
+                    RouteStop endStop = null;
+                    int maxIndex = -1;
+                    for (RouteStop stop : routeStops) {
+                        if (stop.getOrderIndex() > maxIndex) {
+                            maxIndex = stop.getOrderIndex();
+                            endStop = stop;
+                        }
+                    }
+
+                    if (endStop != null && "end".equals(endStop.getAutocompleteFragmentId())) {
+                        // End point exists, place middle stop before it
+                        newOrderIndex = Math.min(newOrderIndex, endStop.getOrderIndex());
+                    }
+
+                    RouteStop newStop = new RouteStop(address, latLng, newOrderIndex, fragmentId);
+                    routeStops.add(newStop);
+
+                    // Reorder stops to maintain sequence
+                    reorderStops();
                 }
 
                 updateMapMarkers();
@@ -392,39 +515,111 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
             @Override
             public void onError(com.google.android.gms.common.api.Status status) {
                 Log.e(TAG, "Middle stop error: " + status);
+                Toast.makeText(CarpoolPostActivity.this, "Error selecting location", Toast.LENGTH_SHORT).show();
             }
         });
 
-        middleStopFragments.add(fragment);
-        btnRemoveStop.setVisibility(View.VISIBLE);
+        // Store fragment reference with its ID
+        autocompleteFragments.put(fragmentId, fragment);
 
-        Toast.makeText(this, "Middle stop added! Select location on map", Toast.LENGTH_SHORT).show();
+        // Add text watcher to detect clearing
+        new android.os.Handler().postDelayed(() -> {
+            setupAutocompleteTextWatcher(fragment, fragmentId);
+        }, 200);
+    }
+
+    private RouteStop findStopByFragmentId(String fragmentId) {
+        for (RouteStop stop : routeStops) {
+            if (fragmentId.equals(stop.getAutocompleteFragmentId())) {
+                return stop;
+            }
+        }
+        return null;
+    }
+
+    private void removeStopByFragmentId(String fragmentId) {
+        RouteStop stopToRemove = findStopByFragmentId(fragmentId);
+        if (stopToRemove != null) {
+            routeStops.remove(stopToRemove);
+
+            // Reorder remaining stops
+            reorderStops();
+            updateMapMarkers();
+            validateFormCompleteness();
+
+            Toast.makeText(this, "Location cleared", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void reorderStops() {
+        // Sort by order index first
+        routeStops.sort((a, b) -> Integer.compare(a.getOrderIndex(), b.getOrderIndex()));
+
+        // Reassign order indices sequentially
+        for (int i = 0; i < routeStops.size(); i++) {
+            routeStops.get(i).orderIndex = i;
+        }
     }
 
     private void removeLastMiddleStop() {
         if (middleStopFragments.isEmpty()) return;
 
-        // Remove last fragment
-        AutocompleteSupportFragment lastFragment = middleStopFragments.remove(middleStopFragments.size() - 1);
-        getSupportFragmentManager().beginTransaction()
-                .remove(lastFragment)
-                .commit();
+        isClearingAutocomplete = true;
 
-        // Remove last middle stop view
+        // Get the last fragment
+        AutocompleteSupportFragment lastFragment = middleStopFragments.get(middleStopFragments.size() - 1);
+
+        // Find the fragment ID
+        String fragmentId = null;
+        for (Map.Entry<String, AutocompleteSupportFragment> entry : autocompleteFragments.entrySet()) {
+            if (entry.getValue() == lastFragment && entry.getKey().startsWith("middle_")) {
+                fragmentId = entry.getKey();
+                break;
+            }
+        }
+
+        if (fragmentId != null) {
+            // Remove the stop associated with this fragment
+            removeStopByFragmentId(fragmentId);
+        }
+
+        // Remove fragment
+        try {
+            getSupportFragmentManager().beginTransaction()
+                    .remove(lastFragment)
+                    .commitNow();
+        } catch (Exception e) {
+            Log.e(TAG, "Error removing fragment: " + e.getMessage());
+            // Try commit instead
+            getSupportFragmentManager().beginTransaction()
+                    .remove(lastFragment)
+                    .commit();
+            getSupportFragmentManager().executePendingTransactions();
+        }
+
+        // Remove from lists
+        middleStopFragments.remove(lastFragment);
+
+        // Remove from autocompleteFragments map
+        if (fragmentId != null) {
+            autocompleteFragments.remove(fragmentId);
+        }
+
+        // Remove the layout
         if (middleStopsContainer.getChildCount() > 0) {
             middleStopsContainer.removeViewAt(middleStopsContainer.getChildCount() - 1);
         }
-
-        // Remove from route stops
-        int lastMiddleIndex = middleStopFragments.size() + 1;
-        routeStops.removeIf(stop -> stop.getOrderIndex() == lastMiddleIndex);
 
         if (middleStopFragments.isEmpty()) {
             btnRemoveStop.setVisibility(View.GONE);
         }
 
+        isClearingAutocomplete = false;
+
         updateMapMarkers();
         validateFormCompleteness();
+
+        Toast.makeText(this, "Middle stop removed", Toast.LENGTH_SHORT).show();
     }
 
     private void updateMapMarkers() {
@@ -466,6 +661,10 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
         if (routeStops.size() >= 2) {
             calculateMultiStopRoute();
             fitMapToAllStops();
+        } else {
+            cardRoutePreview.setVisibility(View.GONE);
+            layoutTrafficInfo.setVisibility(View.GONE);
+            layoutWeatherInfo.setVisibility(View.GONE);
         }
     }
 
@@ -1352,17 +1551,49 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void clearForm() {
-        if (autocompleteStart != null) autocompleteStart.setText("");
-        if (autocompleteEnd != null) autocompleteEnd.setText("");
+        isClearingAutocomplete = true;
+
+        // Clear all autocomplete fragments
+        if (autocompleteStart != null && autocompleteStart.getView() != null) {
+            EditText editText = autocompleteStart.getView().findViewById(
+                    com.google.android.libraries.places.R.id.places_autocomplete_search_input);
+            if (editText != null) {
+                editText.setText("");
+            }
+        }
+
+        if (autocompleteEnd != null && autocompleteEnd.getView() != null) {
+            EditText editText = autocompleteEnd.getView().findViewById(
+                    com.google.android.libraries.places.R.id.places_autocomplete_search_input);
+            if (editText != null) {
+                editText.setText("");
+            }
+        }
 
         // Clear middle stops
         for (AutocompleteSupportFragment fragment : middleStopFragments) {
-            getSupportFragmentManager().beginTransaction().remove(fragment).commit();
+            if (fragment.getView() != null) {
+                EditText editText = fragment.getView().findViewById(
+                        com.google.android.libraries.places.R.id.places_autocomplete_search_input);
+                if (editText != null) {
+                    editText.setText("");
+                }
+                try {
+                    getSupportFragmentManager().beginTransaction().remove(fragment).commitNow();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error removing fragment: " + e.getMessage());
+                }
+            }
         }
+
+        isClearingAutocomplete = false;
+
+        // Clear all data
         middleStopFragments.clear();
         middleStopsContainer.removeAllViews();
-
         routeStops.clear();
+        autocompleteFragments.clear();
+
         tvDepartureTime.setText("Tap to select date & time");
         etTotalFare.setText("");
         layoutFareAnalysis.setVisibility(View.GONE);
