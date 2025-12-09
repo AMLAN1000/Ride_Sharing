@@ -61,6 +61,7 @@
                     android:textColor="#212121"
                     android:layout_marginBottom="16dp" />
 
+                <!-- Starting Point -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -81,12 +82,53 @@
                         android:layout_weight="1">
 
                         <fragment
-                            android:id="@+id/autocomplete_pickup"
+                            android:id="@+id/autocomplete_start"
                             android:name="com.google.android.libraries.places.widget.AutocompleteSupportFragment"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content" />
 
                     </FrameLayout>
+
+                </LinearLayout>
+
+                <!-- Middle Stops Container -->
+                <LinearLayout
+                    android:id="@+id/middle_stops_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="8dp">
+                    <!-- Middle stops will be added dynamically here -->
+                </LinearLayout>
+
+                <!-- Add/Remove Stop Buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="16dp">
+
+                    <Button
+                        android:id="@+id/btn_add_stop"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:text="+ Add Stop"
+                        android:textColor="#2196F3"
+                        android:backgroundTint="#E3F2FD"
+                        app:cornerRadius="8dp" />
+
+                    <Button
+                        android:id="@+id/btn_remove_stop"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="− Remove Stop"
+                        android:textColor="#757575"
+                        android:backgroundTint="#F5F5F5"
+                        app:cornerRadius="8dp"
+                        android:visibility="gone" />
 
                 </LinearLayout>
 
@@ -96,6 +138,7 @@
                     android:background="#E0E0E0"
                     android:layout_marginBottom="16dp" />
 
+                <!-- End Point -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -115,7 +158,7 @@
                         android:layout_weight="1">
 
                         <fragment
-                            android:id="@+id/autocomplete_drop"
+                            android:id="@+id/autocomplete_end"
                             android:name="com.google.android.libraries.places.widget.AutocompleteSupportFragment"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content" />

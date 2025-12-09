@@ -37,20 +37,21 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
     private static final String OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather";
 
     // UI Components
-    private AutocompleteSupportFragment autocompletePickup, autocompleteDrop;
+    private AutocompleteSupportFragment autocompleteStart, autocompleteEnd;
     private TextView tvDepartureTime, tvSeatsCount;
     private TextView tvDistance, tvDuration, tvTrafficInfo, tvWeatherInfo;
     private EditText etTotalFare, etSpecialRequest;
     private Button btnCheckFare, btnPostCarpool, btnDecreaseSeats, btnIncreaseSeats;
+    private Button btnAddStop, btnRemoveStop;
     private MaterialCardView cardRoutePreview;
     private LinearLayout layoutTrafficInfo, layoutFareAnalysis, layoutWeatherInfo;
+    private LinearLayout middleStopsContainer;
     private TextView tvFairRange, tvFairnessMessage, tvDetailedReason, tvSuggestion;
     private RadioGroup radioGroupVehicleType;
     private RadioButton rbCar;
 
     // Map
     private GoogleMap mMap;
-    private Marker pickupMarker, dropMarker;
     private Polyline routePolyline;
 
     // Firebase
@@ -63,7 +64,6 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
     private double farePerPassenger = 0;
     private double minFairFare = 0;
     private double maxFairFare = 0;
-    private LatLng pickupLatLng, dropLatLng;
     private String pickupAddress = "";
     private String dropAddress = "";
     private int seatsAvailable = 3; // Default seats for carpool
@@ -77,6 +77,30 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
     private String weatherDescription = "";
     private double weatherMultiplier = 1.0;
     private double temperature = 0;
+
+    // Route management
+    private List<RouteStop> routeStops = new ArrayList<>();
+    private List<AutocompleteSupportFragment> middleStopFragments = new ArrayList<>();
+
+    // RouteStop class
+    private static class RouteStop {
+        private String address;
+        private LatLng latLng;
+        private int orderIndex;
+
+        public RouteStop(String address, LatLng latLng, int orderIndex) {
+            this.address = address;
+            this.latLng = latLng;
+            this.orderIndex = orderIndex;
+        }
+
+        public String getAddress() { return address; }
+        public LatLng getLatLng() { return latLng; }
+        public int getOrderIndex() { return orderIndex; }
+
+        public void setAddress(String address) { this.address = address; }
+        public void setLatLng(LatLng latLng) { this.latLng = latLng; }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -118,9 +142,15 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
         tvDetailedReason = findViewById(R.id.tv_detailed_reason);
         tvSuggestion = findViewById(R.id.tv_suggestion);
         tvSeatsCount = findViewById(R.id.tv_seats_count);
+        middleStopsContainer = findViewById(R.id.middle_stops_container);
+        btnAddStop = findViewById(R.id.btn_add_stop);
+        btnRemoveStop = findViewById(R.id.btn_remove_stop);
         btnDecreaseSeats = findViewById(R.id.btn_decrease_seats);
         btnIncreaseSeats = findViewById(R.id.btn_increase_seats);
         etSpecialRequest = findViewById(R.id.et_special_request);
+        middleStopsContainer = findViewById(R.id.middle_stops_container);
+        btnAddStop = findViewById(R.id.btn_add_stop);
+        btnRemoveStop = findViewById(R.id.btn_remove_stop);
 
         // Vehicle type selection - Only car for carpool
         radioGroupVehicleType = findViewById(R.id.radio_group_vehicle_type);
@@ -136,6 +166,7 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
         tvSeatsCount.setText(String.valueOf(seatsAvailable));
         btnCheckFare.setEnabled(false);
         btnPostCarpool.setEnabled(false);
+        btnRemoveStop.setVisibility(View.GONE);
 
         // Hide weather layout initially
         layoutWeatherInfo.setVisibility(View.GONE);
@@ -155,79 +186,76 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void setupAutocomplete() {
-        // Pickup Autocomplete
-        autocompletePickup = (AutocompleteSupportFragment)
-                getSupportFragmentManager().findFragmentById(R.id.autocomplete_pickup);
-
-        if (autocompletePickup != null) {
-            autocompletePickup.setPlaceFields(Arrays.asList(
+        // Start Point Autocomplete
+        autocompleteStart = (AutocompleteSupportFragment)
+                getSupportFragmentManager().findFragmentById(R.id.autocomplete_start);
+        if (autocompleteStart != null) {
+            autocompleteStart.setPlaceFields(Arrays.asList(
                     Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.ADDRESS
             ));
-            autocompletePickup.setHint("Pickup location");
-            autocompletePickup.setCountries("BD");
+            autocompleteStart.setHint("Starting point");
+            autocompleteStart.setCountries("BD");
 
-            autocompletePickup.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+            autocompleteStart.setOnPlaceSelectedListener(new PlaceSelectionListener() {
                 @Override
                 public void onPlaceSelected(Place place) {
-                    pickupLatLng = place.getLatLng();
-                    pickupAddress = place.getAddress() != null ? place.getAddress() : place.getName();
+                    LatLng latLng = place.getLatLng();
+                    String address = place.getAddress() != null ? place.getAddress() : place.getName();
 
-                    if (pickupMarker != null) pickupMarker.remove();
-                    pickupMarker = mMap.addMarker(new MarkerOptions()
-                            .position(pickupLatLng)
-                            .title("Pickup")
-                            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)));
-
-                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(pickupLatLng, 15));
-
-                    if (pickupLatLng != null && dropLatLng != null) {
-                        calculateRouteWithDirectionsAPI();
+                    // Update or add start stop
+                    if (routeStops.isEmpty() || routeStops.get(0).getOrderIndex() != 0) {
+                        routeStops.add(0, new RouteStop(address, latLng, 0));
+                    } else {
+                        routeStops.get(0).setAddress(address);
+                        routeStops.get(0).setLatLng(latLng);
                     }
+
+                    updateMapMarkers();
                     validateFormCompleteness();
                 }
 
                 @Override
                 public void onError(com.google.android.gms.common.api.Status status) {
-                    Log.e(TAG, "Pickup error: " + status);
+                    Log.e(TAG, "Start point error: " + status);
                     Toast.makeText(CarpoolPostActivity.this, "Error selecting location", Toast.LENGTH_SHORT).show();
                 }
             });
         }
 
-        // Drop Autocomplete
-        autocompleteDrop = (AutocompleteSupportFragment)
-                getSupportFragmentManager().findFragmentById(R.id.autocomplete_drop);
+        // End Point Autocomplete
+        autocompleteEnd = (AutocompleteSupportFragment)
+                getSupportFragmentManager().findFragmentById(R.id.autocomplete_end);
 
-        if (autocompleteDrop != null) {
-            autocompleteDrop.setPlaceFields(Arrays.asList(
+        if (autocompleteEnd != null) {
+            autocompleteEnd.setPlaceFields(Arrays.asList(
                     Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.ADDRESS
             ));
-            autocompleteDrop.setHint("Drop-off location");
-            autocompleteDrop.setCountries("BD");
+            autocompleteEnd.setHint("End point");
+            autocompleteEnd.setCountries("BD");
 
-            autocompleteDrop.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+            autocompleteEnd.setOnPlaceSelectedListener(new PlaceSelectionListener() {
                 @Override
                 public void onPlaceSelected(Place place) {
-                    dropLatLng = place.getLatLng();
-                    dropAddress = place.getAddress() != null ? place.getAddress() : place.getName();
+                    LatLng latLng = place.getLatLng();
+                    String address = place.getAddress() != null ? place.getAddress() : place.getName();
 
-                    if (dropMarker != null) dropMarker.remove();
-                    dropMarker = mMap.addMarker(new MarkerOptions()
-                            .position(dropLatLng)
-                            .title("Drop-off")
-                            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
+                    // Always update/add as last stop
+                    int lastIndex = routeStops.size();
+                    RouteStop endStop = new RouteStop(address, latLng, lastIndex);
 
-                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(dropLatLng, 15));
-
-                    if (pickupLatLng != null && dropLatLng != null) {
-                        calculateRouteWithDirectionsAPI();
+                    // Remove old end stop if exists
+                    if (!routeStops.isEmpty() && routeStops.get(routeStops.size() - 1).getOrderIndex() == lastIndex - 1) {
+                        routeStops.remove(routeStops.size() - 1);
                     }
+
+                    routeStops.add(endStop);
+                    updateMapMarkers();
                     validateFormCompleteness();
                 }
 
                 @Override
                 public void onError(com.google.android.gms.common.api.Status status) {
-                    Log.e(TAG, "Drop error: " + status);
+                    Log.e(TAG, "End point error: " + status);
                     Toast.makeText(CarpoolPostActivity.this, "Error selecting location", Toast.LENGTH_SHORT).show();
                 }
             });
@@ -238,6 +266,8 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
         tvDepartureTime.setOnClickListener(v -> showDateTimePicker());
         btnCheckFare.setOnClickListener(v -> checkFareFairness());
         btnPostCarpool.setOnClickListener(v -> postCarpool());
+        btnAddStop.setOnClickListener(v -> addMiddleStop());
+        btnRemoveStop.setOnClickListener(v -> removeLastMiddleStop());
 
         radioGroupVehicleType.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.rb_car) {
@@ -271,25 +301,176 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
         });
     }
 
-    @Override
-    public void onMapReady(GoogleMap googleMap) {
-        mMap = googleMap;
-        mMap.getUiSettings().setZoomControlsEnabled(true);
-        mMap.getUiSettings().setCompassEnabled(true);
-
-        try {
-            mMap.setMyLocationEnabled(true);
-            mMap.getUiSettings().setMyLocationButtonEnabled(true);
-        } catch (SecurityException e) {
-            Log.e(TAG, "Location permission not granted", e);
+    private void addMiddleStop() {
+        if (middleStopFragments.size() >= 3) {
+            Toast.makeText(this, "Maximum 3 middle stops allowed", Toast.LENGTH_SHORT).show();
+            return;
         }
 
-        LatLng dhaka = new LatLng(23.8103, 90.4125);
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(dhaka, 12));
+        if (routeStops.isEmpty()) {
+            Toast.makeText(this, "Please select starting point first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Create container for new stop
+        LinearLayout stopLayout = new LinearLayout(this);
+        stopLayout.setOrientation(LinearLayout.HORIZONTAL);
+        stopLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(0, 0, 0, 24);
+        stopLayout.setLayoutParams(params);
+
+        // Add icon
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(android.R.drawable.ic_menu_mylocation);
+        icon.setColorFilter(getResources().getColor(android.R.color.holo_orange_light));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(48, 48);
+        iconParams.setMarginEnd(16);
+        icon.setLayoutParams(iconParams);
+        stopLayout.addView(icon);
+
+        // Add autocomplete fragment
+        FrameLayout fragmentContainer = new FrameLayout(this);
+        LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1.0f
+        );
+        fragmentContainer.setLayoutParams(containerParams);
+        fragmentContainer.setId(View.generateViewId());
+        stopLayout.addView(fragmentContainer);
+
+        middleStopsContainer.addView(stopLayout);
+
+        // Create and add fragment
+        AutocompleteSupportFragment fragment = new AutocompleteSupportFragment();
+        getSupportFragmentManager().beginTransaction()
+                .add(fragmentContainer.getId(), fragment)
+                .commit();
+
+        fragment.setPlaceFields(Arrays.asList(
+                Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG, Place.Field.ADDRESS
+        ));
+        fragment.setHint("Stop " + (middleStopFragments.size() + 1));
+        fragment.setCountries("BD");
+
+        final int stopIndex = middleStopFragments.size() + 1; // +1 because 0 is start
+
+        fragment.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+            @Override
+            public void onPlaceSelected(Place place) {
+                LatLng latLng = place.getLatLng();
+                String address = place.getAddress() != null ? place.getAddress() : place.getName();
+
+                // Add or update middle stop
+                RouteStop newStop = new RouteStop(address, latLng, stopIndex);
+
+                // Find and replace or add
+                boolean found = false;
+                for (int i = 0; i < routeStops.size(); i++) {
+                    if (routeStops.get(i).getOrderIndex() == stopIndex) {
+                        routeStops.set(i, newStop);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    // Insert at correct position
+                    int insertPos = stopIndex;
+                    if (insertPos > routeStops.size()) insertPos = routeStops.size();
+                    routeStops.add(insertPos, newStop);
+                }
+
+                updateMapMarkers();
+                validateFormCompleteness();
+            }
+
+            @Override
+            public void onError(com.google.android.gms.common.api.Status status) {
+                Log.e(TAG, "Middle stop error: " + status);
+            }
+        });
+
+        middleStopFragments.add(fragment);
+        btnRemoveStop.setVisibility(View.VISIBLE);
+
+        Toast.makeText(this, "Middle stop added! Select location on map", Toast.LENGTH_SHORT).show();
     }
 
-    private void calculateRouteWithDirectionsAPI() {
-        if (pickupLatLng == null || dropLatLng == null) return;
+    private void removeLastMiddleStop() {
+        if (middleStopFragments.isEmpty()) return;
+
+        // Remove last fragment
+        AutocompleteSupportFragment lastFragment = middleStopFragments.remove(middleStopFragments.size() - 1);
+        getSupportFragmentManager().beginTransaction()
+                .remove(lastFragment)
+                .commit();
+
+        // Remove last middle stop view
+        if (middleStopsContainer.getChildCount() > 0) {
+            middleStopsContainer.removeViewAt(middleStopsContainer.getChildCount() - 1);
+        }
+
+        // Remove from route stops
+        int lastMiddleIndex = middleStopFragments.size() + 1;
+        routeStops.removeIf(stop -> stop.getOrderIndex() == lastMiddleIndex);
+
+        if (middleStopFragments.isEmpty()) {
+            btnRemoveStop.setVisibility(View.GONE);
+        }
+
+        updateMapMarkers();
+        validateFormCompleteness();
+    }
+
+    private void updateMapMarkers() {
+        if (mMap == null) return;
+
+        // Clear all markers
+        mMap.clear();
+        if (routePolyline != null) {
+            routePolyline.remove();
+            routePolyline = null;
+        }
+
+        // Sort stops by order
+        routeStops.sort((a, b) -> Integer.compare(a.getOrderIndex(), b.getOrderIndex()));
+
+        // Add markers for each stop
+        for (RouteStop stop : routeStops) {
+            float color;
+            String title;
+
+            if (stop.getOrderIndex() == 0) {
+                color = BitmapDescriptorFactory.HUE_GREEN;
+                title = "Start: " + stop.getAddress();
+            } else if (stop.getOrderIndex() == routeStops.size() - 1) {
+                color = BitmapDescriptorFactory.HUE_RED;
+                title = "End: " + stop.getAddress();
+            } else {
+                color = BitmapDescriptorFactory.HUE_ORANGE;
+                title = "Stop " + stop.getOrderIndex() + ": " + stop.getAddress();
+            }
+
+            mMap.addMarker(new MarkerOptions()
+                    .position(stop.getLatLng())
+                    .title(title)
+                    .icon(BitmapDescriptorFactory.defaultMarker(color)));
+        }
+
+        // Calculate route if we have at least 2 stops
+        if (routeStops.size() >= 2) {
+            calculateMultiStopRoute();
+            fitMapToAllStops();
+        }
+    }
+
+    private void calculateMultiStopRoute() {
+        if (routeStops.size() < 2) return;
 
         cardRoutePreview.setVisibility(View.VISIBLE);
         tvDistance.setText("Calculating...");
@@ -297,12 +478,23 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
 
         new Thread(() -> {
             try {
-                String origin = pickupLatLng.latitude + "," + pickupLatLng.longitude;
-                String destination = dropLatLng.latitude + "," + dropLatLng.longitude;
+                // Build waypoints string
+                StringBuilder waypointsBuilder = new StringBuilder();
+                for (int i = 1; i < routeStops.size() - 1; i++) {
+                    if (i > 1) waypointsBuilder.append("|");
+                    LatLng point = routeStops.get(i).getLatLng();
+                    waypointsBuilder.append(point.latitude).append(",").append(point.longitude);
+                }
+
+                String origin = routeStops.get(0).getLatLng().latitude + "," +
+                        routeStops.get(0).getLatLng().longitude;
+                String destination = routeStops.get(routeStops.size() - 1).getLatLng().latitude + "," +
+                        routeStops.get(routeStops.size() - 1).getLatLng().longitude;
 
                 String urlString = "https://maps.googleapis.com/maps/api/directions/json?" +
                         "origin=" + origin +
                         "&destination=" + destination +
+                        (waypointsBuilder.length() > 0 ? "&waypoints=" + waypointsBuilder.toString() : "") +
                         "&mode=driving" +
                         "&departure_time=now" +
                         "&traffic_model=best_guess" +
@@ -324,16 +516,269 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
                 parseDirectionsResponse(jsonResponse);
 
                 // Fetch weather after route calculation
-                fetchWeatherData(pickupLatLng);
+                fetchWeatherData(routeStops.get(0).getLatLng());
 
             } catch (Exception e) {
-                Log.e(TAG, "Error fetching directions", e);
+                Log.e(TAG, "Error fetching multi-stop directions", e);
                 runOnUiThread(() -> {
-                    routeDistance = calculateHaversineDistance(pickupLatLng, dropLatLng);
+                    routeDistance = calculateTotalRouteDistance();
                     simulateTrafficAndRouteCalculation();
                 });
             }
         }).start();
+    }
+
+    private double calculateTotalRouteDistance() {
+        double total = 0;
+        for (int i = 0; i < routeStops.size() - 1; i++) {
+            total += calculateHaversineDistance(
+                    routeStops.get(i).getLatLng(),
+                    routeStops.get(i + 1).getLatLng()
+            );
+        }
+        return total;
+    }
+
+    private void fitMapToAllStops() {
+        if (routeStops.isEmpty()) return;
+
+        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+        for (RouteStop stop : routeStops) {
+            builder.include(stop.getLatLng());
+        }
+
+        try {
+            LatLngBounds bounds = builder.build();
+            mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 100));
+        } catch (Exception e) {
+            Log.e(TAG, "Error fitting map to stops", e);
+        }
+    }
+
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+        mMap = googleMap;
+        mMap.getUiSettings().setZoomControlsEnabled(true);
+        mMap.getUiSettings().setCompassEnabled(true);
+
+        try {
+            mMap.setMyLocationEnabled(true);
+            mMap.getUiSettings().setMyLocationButtonEnabled(true);
+        } catch (SecurityException e) {
+            Log.e(TAG, "Location permission not granted", e);
+        }
+
+        LatLng dhaka = new LatLng(23.8103, 90.4125);
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(dhaka, 12));
+    }
+
+    private void parseDirectionsResponse(JSONObject jsonResponse) {
+        try {
+            JSONArray routes = jsonResponse.getJSONArray("routes");
+            if (routes.length() > 0) {
+                JSONObject route = routes.getJSONObject(0);
+                JSONArray legs = route.getJSONArray("legs");
+
+                double totalDistance = 0;
+                double totalDuration = 0;
+                double totalTrafficDuration = 0;
+
+                for (int i = 0; i < legs.length(); i++) {
+                    JSONObject leg = legs.getJSONObject(i);
+
+                    JSONObject distance = leg.getJSONObject("distance");
+                    totalDistance += distance.getDouble("value") / 1000.0;
+
+                    JSONObject duration = leg.getJSONObject("duration");
+                    totalDuration += duration.getDouble("value") / 60.0;
+
+                    if (leg.has("duration_in_traffic")) {
+                        JSONObject durationInTraffic = leg.getJSONObject("duration_in_traffic");
+                        totalTrafficDuration += durationInTraffic.getDouble("value") / 60.0;
+                    } else {
+                        totalTrafficDuration += (duration.getDouble("value") / 60.0) * getTrafficMultiplier();
+                    }
+                }
+
+                routeDistance = totalDistance;
+                routeDuration = totalDuration;
+                trafficDuration = totalTrafficDuration;
+
+                JSONObject polyline = route.getJSONObject("overview_polyline");
+                String encodedPolyline = polyline.getString("points");
+
+                runOnUiThread(() -> {
+                    updateRouteUI();
+                    drawEncodedPolyline(encodedPolyline);
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing directions", e);
+            runOnUiThread(() -> {
+                routeDistance = calculateTotalRouteDistance();
+                simulateTrafficAndRouteCalculation();
+            });
+        }
+    }
+
+    private void simulateTrafficAndRouteCalculation() {
+        routeDuration = routeDistance * 2;
+        trafficDuration = routeDuration * getTrafficMultiplier();
+        updateRouteUI();
+        drawStraightLineBetweenStops();
+    }
+
+    private void drawStraightLineBetweenStops() {
+        if (mMap == null || routeStops.size() < 2) return;
+
+        if (routePolyline != null) {
+            routePolyline.remove();
+        }
+
+        List<LatLng> points = new ArrayList<>();
+        for (RouteStop stop : routeStops) {
+            points.add(stop.getLatLng());
+        }
+
+        routePolyline = mMap.addPolyline(new PolylineOptions()
+                .addAll(points)
+                .width(8)
+                .color(getResources().getColor(android.R.color.holo_blue_dark))
+                .geodesic(true));
+    }
+
+    private void updateRouteUI() {
+        tvDistance.setText(String.format(Locale.getDefault(), "%.1f km", routeDistance));
+        tvDuration.setText(String.format(Locale.getDefault(), "%.0f min", trafficDuration));
+
+        layoutTrafficInfo.setVisibility(View.VISIBLE);
+        String trafficLevel = getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY));
+        tvTrafficInfo.setText("Traffic: " + trafficLevel);
+    }
+
+    private void drawEncodedPolyline(String encodedPolyline) {
+        if (mMap == null) return;
+
+        if (routePolyline != null) {
+            routePolyline.remove();
+        }
+
+        List<LatLng> points = decodePolyline(encodedPolyline);
+        routePolyline = mMap.addPolyline(new PolylineOptions()
+                .addAll(points)
+                .width(8)
+                .color(getResources().getColor(android.R.color.holo_blue_dark))
+                .geodesic(true));
+
+        fitMapToRoute();
+    }
+
+    private void fitMapToRoute() {
+        if (routeStops.isEmpty()) return;
+
+        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+        for (RouteStop stop : routeStops) {
+            builder.include(stop.getLatLng());
+        }
+        LatLngBounds bounds = builder.build();
+
+        mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 100));
+    }
+
+    private List<LatLng> decodePolyline(String encoded) {
+        List<LatLng> poly = new ArrayList<>();
+        int index = 0, len = encoded.length();
+        int lat = 0, lng = 0;
+
+        while (index < len) {
+            int b, shift = 0, result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lat += dlat;
+
+            shift = 0;
+            result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lng += dlng;
+
+            LatLng p = new LatLng((((double) lat / 1E5)), (((double) lng / 1E5)));
+            poly.add(p);
+        }
+
+        return poly;
+    }
+
+    private void showDateTimePicker() {
+        Calendar now = Calendar.getInstance();
+        TimePickerDialog timePickerDialog = new TimePickerDialog(
+                this,
+                (view, hourOfDay, minute) -> {
+                    Calendar selectedTime = Calendar.getInstance();
+                    selectedTime.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                    selectedTime.set(Calendar.MINUTE, minute);
+                    selectedTime.set(Calendar.SECOND, 0);
+                    selectedTime.set(Calendar.MILLISECOND, 0);
+
+                    Calendar maxTime = Calendar.getInstance();
+                    maxTime.add(Calendar.HOUR_OF_DAY, 1);
+
+                    if (selectedTime.before(now)) {
+                        Toast.makeText(this,
+                                "❌ Departure time cannot be in the past.",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
+                    if (selectedTime.after(maxTime)) {
+                        Toast.makeText(this,
+                                "❌ Departure time cannot be more than 1 hour from now.",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
+                    calendar.setTimeInMillis(selectedTime.getTimeInMillis());
+                    updateTimeButton();
+                    validateFormCompleteness();
+
+                    Toast.makeText(this,
+                            "✅ Departure time set successfully",
+                            Toast.LENGTH_SHORT).show();
+                },
+                now.get(Calendar.HOUR_OF_DAY),
+                now.get(Calendar.MINUTE),
+                false
+        );
+
+        timePickerDialog.setTitle("Select Departure Time (Max 1 hour from now)");
+        timePickerDialog.show();
+    }
+
+    private void updateTimeButton() {
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault());
+        tvDepartureTime.setText(sdf.format(calendar.getTime()));
+    }
+
+    private void validateFormCompleteness() {
+        boolean pickupSelected = !routeStops.isEmpty() && routeStops.get(0).getOrderIndex() == 0;
+        boolean dropSelected = routeStops.size() >= 2;
+        boolean fareEntered = !etTotalFare.getText().toString().trim().isEmpty();
+        boolean timeSelected = !tvDepartureTime.getText().toString().equals("Tap to select date & time");
+
+        boolean isComplete = pickupSelected && dropSelected && fareEntered && timeSelected;
+
+        btnCheckFare.setEnabled(isComplete);
+        btnCheckFare.setBackgroundColor(isComplete ?
+                getResources().getColor(android.R.color.holo_blue_dark) :
+                getResources().getColor(android.R.color.darker_gray));
     }
 
     private void fetchWeatherData(LatLng location) {
@@ -467,262 +912,24 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
         }
     }
 
-    private void parseDirectionsResponse(JSONObject jsonResponse) {
-        try {
-            JSONArray routes = jsonResponse.getJSONArray("routes");
-            if (routes.length() > 0) {
-                JSONObject route = routes.getJSONObject(0);
-                JSONArray legs = route.getJSONArray("legs");
-
-                if (legs.length() > 0) {
-                    JSONObject leg = legs.getJSONObject(0);
-
-                    JSONObject distance = leg.getJSONObject("distance");
-                    routeDistance = distance.getDouble("value") / 1000.0;
-
-                    JSONObject duration = leg.getJSONObject("duration");
-                    routeDuration = duration.getDouble("value") / 60.0;
-
-                    if (leg.has("duration_in_traffic")) {
-                        JSONObject durationInTraffic = leg.getJSONObject("duration_in_traffic");
-                        trafficDuration = durationInTraffic.getDouble("value") / 60.0;
-                    } else {
-                        trafficDuration = routeDuration * getTrafficMultiplier();
-                    }
-
-                    JSONObject polyline = route.getJSONObject("overview_polyline");
-                    String encodedPolyline = polyline.getString("points");
-
-                    runOnUiThread(() -> {
-                        updateRouteUI();
-                        drawEncodedPolyline(encodedPolyline);
-                    });
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error parsing directions", e);
-            runOnUiThread(() -> {
-                routeDistance = calculateHaversineDistance(pickupLatLng, dropLatLng);
-                simulateTrafficAndRouteCalculation();
-            });
-        }
-    }
-
-    private void simulateTrafficAndRouteCalculation() {
-        routeDuration = routeDistance * 2;
-        trafficDuration = routeDuration * getTrafficMultiplier();
-        updateRouteUI();
-        drawStraightLine();
-    }
-
-    private void updateRouteUI() {
-        tvDistance.setText(String.format(Locale.getDefault(), "%.1f km", routeDistance));
-        tvDuration.setText(String.format(Locale.getDefault(), "%.0f min", trafficDuration));
-
-        layoutTrafficInfo.setVisibility(View.VISIBLE);
-        String trafficLevel = getTrafficLevel(calendar.get(Calendar.HOUR_OF_DAY));
-        tvTrafficInfo.setText("Traffic: " + trafficLevel);
-    }
-
-    private void drawEncodedPolyline(String encodedPolyline) {
-        if (mMap == null) return;
-
-        if (routePolyline != null) {
-            routePolyline.remove();
-        }
-
-        List<LatLng> points = decodePolyline(encodedPolyline);
-        routePolyline = mMap.addPolyline(new PolylineOptions()
-                .addAll(points)
-                .width(8)
-                .color(getResources().getColor(android.R.color.holo_blue_dark))
-                .geodesic(true));
-
-        fitMapToRoute();
-    }
-
-    private void drawStraightLine() {
-        if (mMap == null || pickupLatLng == null || dropLatLng == null) return;
-
-        if (routePolyline != null) {
-            routePolyline.remove();
-        }
-
-        routePolyline = mMap.addPolyline(new PolylineOptions()
-                .add(pickupLatLng, dropLatLng)
-                .width(8)
-                .color(getResources().getColor(android.R.color.holo_blue_dark))
-                .geodesic(true));
-
-        fitMapToRoute();
-    }
-
-    private void fitMapToRoute() {
-        if (pickupLatLng == null || dropLatLng == null) return;
-
-        LatLngBounds.Builder builder = new LatLngBounds.Builder();
-        builder.include(pickupLatLng);
-        builder.include(dropLatLng);
-        LatLngBounds bounds = builder.build();
-
-        mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 100));
-    }
-
-    private List<LatLng> decodePolyline(String encoded) {
-        List<LatLng> poly = new ArrayList<>();
-        int index = 0, len = encoded.length();
-        int lat = 0, lng = 0;
-
-        while (index < len) {
-            int b, shift = 0, result = 0;
-            do {
-                b = encoded.charAt(index++) - 63;
-                result |= (b & 0x1f) << shift;
-                shift += 5;
-            } while (b >= 0x20);
-            int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-            lat += dlat;
-
-            shift = 0;
-            result = 0;
-            do {
-                b = encoded.charAt(index++) - 63;
-                result |= (b & 0x1f) << shift;
-                shift += 5;
-            } while (b >= 0x20);
-            int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-            lng += dlng;
-
-            LatLng p = new LatLng((((double) lat / 1E5)), (((double) lng / 1E5)));
-            poly.add(p);
-        }
-
-        return poly;
-    }
-
-    private void showDateTimePicker() {
-        // Get current time
-        Calendar now = Calendar.getInstance();
-
-        // Show time picker directly (no date picker needed since max is 1 hour)
-        TimePickerDialog timePickerDialog = new TimePickerDialog(
-                this,
-                (view, hourOfDay, minute) -> {
-                    // Set the selected time
-                    Calendar selectedTime = Calendar.getInstance();
-                    selectedTime.set(Calendar.HOUR_OF_DAY, hourOfDay);
-                    selectedTime.set(Calendar.MINUTE, minute);
-                    selectedTime.set(Calendar.SECOND, 0);
-                    selectedTime.set(Calendar.MILLISECOND, 0);
-
-                    // Get current time + 1 hour max
-                    Calendar maxTime = Calendar.getInstance();
-                    maxTime.add(Calendar.HOUR_OF_DAY, 1);
-
-                    // Validate: Can't be in the past
-                    if (selectedTime.before(now)) {
-                        Toast.makeText(this,
-                                "❌ Departure time cannot be in the past. Please select a future time.",
-                                Toast.LENGTH_LONG).show();
-                        return;
-                    }
-
-                    // Validate: Can't be more than 1 hour in future
-                    if (selectedTime.after(maxTime)) {
-                        Toast.makeText(this,
-                                "❌ Departure time cannot be more than 1 hour from now. Maximum: " +
-                                        new SimpleDateFormat("hh:mm a", Locale.getDefault()).format(maxTime.getTime()),
-                                Toast.LENGTH_LONG).show();
-                        return;
-                    }
-
-                    // Valid time - save it
-                    calendar.setTimeInMillis(selectedTime.getTimeInMillis());
-                    updateTimeButton();
-                    validateFormCompleteness();
-
-                    Toast.makeText(this,
-                            "✅ Departure time set successfully",
-                            Toast.LENGTH_SHORT).show();
-                },
-                now.get(Calendar.HOUR_OF_DAY),
-                now.get(Calendar.MINUTE),
-                false // 12-hour format
-        );
-
-        // Set title with instructions
-        timePickerDialog.setTitle("Select Departure Time (Max 1 hour from now)");
-        timePickerDialog.show();
-    }
-
-    private void updateTimeButton() {
-        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault());
-        tvDepartureTime.setText(sdf.format(calendar.getTime()));
-    }
-
-    private void validateFormCompleteness() {
-        boolean pickupSelected = pickupLatLng != null;
-        boolean dropSelected = dropLatLng != null;
-        boolean fareEntered = !etTotalFare.getText().toString().trim().isEmpty();
-        boolean timeSelected = !tvDepartureTime.getText().toString().equals("Tap to select date & time");
-
-        boolean isComplete = pickupSelected && dropSelected && fareEntered && timeSelected;
-
-        btnCheckFare.setEnabled(isComplete);
-        btnCheckFare.setBackgroundColor(isComplete ?
-                getResources().getColor(android.R.color.holo_blue_dark) :
-                getResources().getColor(android.R.color.darker_gray));
-    }
-
     private void checkFareFairness() {
-        // Disable button and show analyzing state
         btnCheckFare.setText("Analyzing...");
         btnCheckFare.setEnabled(false);
         layoutFareAnalysis.setVisibility(View.VISIBLE);
 
-        // Show professional analyzing messages
         tvFairnessMessage.setTextColor(getResources().getColor(android.R.color.darker_gray));
         tvFairnessMessage.setText("🔍 Analyzing fare fairness...");
         tvDetailedReason.setVisibility(View.VISIBLE);
         tvSuggestion.setVisibility(View.GONE);
 
-        // Professional step-by-step analysis display
-        final String[] analysisSteps = {
-                "📍 Calculating route distance...",
-                "🚦 Analyzing traffic conditions...",
-                "🌤️ Checking weather impact...",
-                "⏰ Evaluating time factors...",
-                "💰 Computing fair fare range...",
-                "✅ Finalizing results..."
-        };
-
-        final int[] stepIndex = {0};
-        final android.os.Handler handler = new android.os.Handler();
-
-        // Show each step with 300ms delay
-        Runnable stepRunner = new Runnable() {
-            @Override
-            public void run() {
-                if (stepIndex[0] < analysisSteps.length) {
-                    tvDetailedReason.setText(analysisSteps[stepIndex[0]]);
-                    stepIndex[0]++;
-                    handler.postDelayed(this, 300); // 300ms per step = ~2 seconds total
-                } else {
-                    // All steps done, now calculate actual fairness
-                    new Thread(() -> {
-                        calculateFareFairness();
-                        runOnUiThread(() -> resetCheckFareButton());
-                    }).start();
-                }
-            }
-        };
-
-        // Start the step-by-step animation
-        handler.post(stepRunner);
+        new Thread(() -> {
+            calculateFareFairness();
+            runOnUiThread(() -> resetCheckFareButton());
+        }).start();
     }
 
     private void calculateFareFairness() {
-        if (pickupLatLng == null || dropLatLng == null) {
+        if (routeStops.size() < 2) {
             runOnUiThread(() -> showFareResult("Please select valid locations", false, ""));
             return;
         }
@@ -743,7 +950,7 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
             if (finalUserFare >= minFairFare && finalUserFare <= maxFairFare) {
                 // Calculate per passenger fare
                 farePerPassenger = finalUserFare / seatsAvailable;
-                farePerPassenger = Math.round(farePerPassenger / 5) * 5; // Round to nearest 5
+                farePerPassenger = Math.round(farePerPassenger / 5) * 5;
 
                 String reason = getFareFairReason(finalUserFare);
                 showFareResult("✓ Fare is fair! Per passenger: ৳" +
@@ -1070,12 +1277,29 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
         carpoolRequest.put("driverRating", 4.5);
 
         // Trip details
-        carpoolRequest.put("pickupLocation", pickupAddress);
-        carpoolRequest.put("dropLocation", dropAddress);
-        carpoolRequest.put("pickupLat", pickupLatLng.latitude);
-        carpoolRequest.put("pickupLng", pickupLatLng.longitude);
-        carpoolRequest.put("dropLat", dropLatLng.latitude);
-        carpoolRequest.put("dropLng", dropLatLng.longitude);
+        if (!routeStops.isEmpty()) {
+            RouteStop firstStop = routeStops.get(0);
+            RouteStop lastStop = routeStops.get(routeStops.size() - 1);
+
+            carpoolRequest.put("pickupLocation", firstStop.getAddress());
+            carpoolRequest.put("dropLocation", lastStop.getAddress());
+            carpoolRequest.put("pickupLat", firstStop.getLatLng().latitude);
+            carpoolRequest.put("pickupLng", firstStop.getLatLng().longitude);
+            carpoolRequest.put("dropLat", lastStop.getLatLng().latitude);
+            carpoolRequest.put("dropLng", lastStop.getLatLng().longitude);
+        }
+
+        // Store all route stops
+        List<Map<String, Object>> stopsData = new ArrayList<>();
+        for (RouteStop stop : routeStops) {
+            Map<String, Object> stopData = new HashMap<>();
+            stopData.put("address", stop.getAddress());
+            stopData.put("lat", stop.getLatLng().latitude);
+            stopData.put("lng", stop.getLatLng().longitude);
+            stopData.put("orderIndex", stop.getOrderIndex());
+            stopsData.add(stopData);
+        }
+        carpoolRequest.put("routeStops", stopsData);
 
         // Fare and vehicle
         double totalFare = Double.parseDouble(etTotalFare.getText().toString().trim());
@@ -1116,12 +1340,8 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
     }
 
     private boolean validateForm() {
-        if (pickupLatLng == null) {
-            Toast.makeText(this, "Select pickup location", Toast.LENGTH_SHORT).show();
-            return false;
-        }
-        if (dropLatLng == null) {
-            Toast.makeText(this, "Select drop location", Toast.LENGTH_SHORT).show();
+        if (routeStops.size() < 2) {
+            Toast.makeText(this, "Select at least pickup and drop locations", Toast.LENGTH_SHORT).show();
             return false;
         }
         if (etTotalFare.getText().toString().trim().isEmpty()) {
@@ -1132,12 +1352,17 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void clearForm() {
-        if (autocompletePickup != null) autocompletePickup.setText("");
-        if (autocompleteDrop != null) autocompleteDrop.setText("");
-        pickupLatLng = null;
-        dropLatLng = null;
-        pickupAddress = "";
-        dropAddress = "";
+        if (autocompleteStart != null) autocompleteStart.setText("");
+        if (autocompleteEnd != null) autocompleteEnd.setText("");
+
+        // Clear middle stops
+        for (AutocompleteSupportFragment fragment : middleStopFragments) {
+            getSupportFragmentManager().beginTransaction().remove(fragment).commit();
+        }
+        middleStopFragments.clear();
+        middleStopsContainer.removeAllViews();
+
+        routeStops.clear();
         tvDepartureTime.setText("Tap to select date & time");
         etTotalFare.setText("");
         layoutFareAnalysis.setVisibility(View.GONE);
@@ -1157,6 +1382,7 @@ public class CarpoolPostActivity extends AppCompatActivity implements OnMapReady
         btnPostCarpool.setEnabled(false);
         btnPostCarpool.setText("Post Carpool");
         btnCheckFare.setEnabled(false);
+        btnRemoveStop.setVisibility(View.GONE);
 
         currentWeather = "Clear";
         weatherDescription = "";

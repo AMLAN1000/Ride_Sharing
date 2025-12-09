@@ -1,5 +1,8 @@
 package com.example.ridesharing;
 
+import java.util.List;
+import java.util.Map;
+
 public class MyRideItem {
     private String id;
     private String status;
@@ -10,39 +13,28 @@ public class MyRideItem {
     private int passengers;
     private Long departureTime;
     private Long acceptedAt;
-
-    // Info about the other person (driver if you're passenger, passenger if you're driver)
     private String otherPersonName;
     private String otherPersonPhone;
     private String otherPersonId;
+    private boolean isPassengerView;
 
-    // Role indicator
-    private boolean isPassengerView; // true = viewing as passenger, false = viewing as driver
-
-    // New fields for carpool support
+    // Carpool specific fields
     private boolean isCarpool;
     private double farePerPassenger;
     private int maxSeats;
     private int passengerCount;
-    private String allPassengerNames; // For displaying multiple passengers
-    private int unreadMessageCount; // NEW: For unread message badge
+    private String allPassengerNames;
+    private int unreadCount;
+
+    // NEW: Store individual passenger details for driver view
+    private List<PassengerDetail> passengerDetails;
 
     public MyRideItem(String id, String status, String pickupLocation, String dropLocation,
-                      double fare, String vehicleType, int passengers,
-                      Long departureTime, Long acceptedAt,
-                      String otherPersonName, String otherPersonPhone, String otherPersonId,
-                      boolean isPassengerView) {
-        this(id, status, pickupLocation, dropLocation, fare, vehicleType, passengers,
-                departureTime, acceptedAt, otherPersonName, otherPersonPhone, otherPersonId,
-                isPassengerView, false, 0.0, 1, 0, "", 0);
-    }
-
-    public MyRideItem(String id, String status, String pickupLocation, String dropLocation,
-                      double fare, String vehicleType, int passengers,
-                      Long departureTime, Long acceptedAt,
-                      String otherPersonName, String otherPersonPhone, String otherPersonId,
-                      boolean isPassengerView, boolean isCarpool, double farePerPassenger,
-                      int maxSeats, int passengerCount, String allPassengerNames, int unreadMessageCount) {
+                      double fare, String vehicleType, int passengers, Long departureTime,
+                      Long acceptedAt, String otherPersonName, String otherPersonPhone,
+                      String otherPersonId, boolean isPassengerView, boolean isCarpool,
+                      double farePerPassenger, int maxSeats, int passengerCount,
+                      String allPassengerNames, int unreadCount) {
         this.id = id;
         this.status = status;
         this.pickupLocation = pickupLocation;
@@ -61,7 +53,31 @@ public class MyRideItem {
         this.maxSeats = maxSeats;
         this.passengerCount = passengerCount;
         this.allPassengerNames = allPassengerNames;
-        this.unreadMessageCount = unreadMessageCount;
+        this.unreadCount = unreadCount;
+    }
+
+    // Inner class to hold passenger details
+    public static class PassengerDetail {
+        private String name;
+        private String phone;
+        private String pickupLocation;
+        private String dropLocation;
+        private double fare;
+
+        public PassengerDetail(String name, String phone, String pickupLocation,
+                               String dropLocation, double fare) {
+            this.name = name;
+            this.phone = phone;
+            this.pickupLocation = pickupLocation;
+            this.dropLocation = dropLocation;
+            this.fare = fare;
+        }
+
+        public String getName() { return name; }
+        public String getPhone() { return phone; }
+        public String getPickupLocation() { return pickupLocation; }
+        public String getDropLocation() { return dropLocation; }
+        public double getFare() { return fare; }
     }
 
     // Getters
@@ -78,17 +94,16 @@ public class MyRideItem {
     public String getOtherPersonPhone() { return otherPersonPhone; }
     public String getOtherPersonId() { return otherPersonId; }
     public boolean isPassengerView() { return isPassengerView; }
-
-    // New getters
     public boolean isCarpool() { return isCarpool; }
     public double getFarePerPassenger() { return farePerPassenger; }
     public int getMaxSeats() { return maxSeats; }
     public int getPassengerCount() { return passengerCount; }
     public String getAllPassengerNames() { return allPassengerNames; }
-    public int getUnreadMessageCount() { return unreadMessageCount; }
+    public int getUnreadCount() { return unreadCount; }
+    public List<PassengerDetail> getPassengerDetails() { return passengerDetails; }
 
-    // Helper methods
-    public String getRoleLabel() {
-        return isPassengerView ? "Driver" : "Passenger";
+    // Setters
+    public void setPassengerDetails(List<PassengerDetail> passengerDetails) {
+        this.passengerDetails = passengerDetails;
     }
 }

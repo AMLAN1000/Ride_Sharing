@@ -439,6 +439,12 @@ public class MyRidesActivity extends AppCompatActivity {
 
             List<String> passengerNames = (List<String>) document.get("passengerNames");
             List<String> passengerIds = (List<String>) document.get("passengerIds");
+            List<String> passengerPhones = (List<String>) document.get("passengerPhones");
+
+            // NEW: Get passenger-specific locations and fares
+            List<Map<String, Object>> passengerPickups = (List<Map<String, Object>>) document.get("passengerPickups");
+            List<Map<String, Object>> passengerDrops = (List<Map<String, Object>>) document.get("passengerDrops");
+            List<Double> passengerFares = (List<Double>) document.get("passengerFares");
 
             String driverId = document.getString("driverId");
             String driverName = document.getString("driverName");
@@ -449,6 +455,9 @@ public class MyRidesActivity extends AppCompatActivity {
             String otherPersonPhone;
             String otherPersonId;
             String allPassengerNames = "";
+            String displayPickup = pickupLocation;
+            String displayDrop = dropLocation;
+            double displayFare = fare != null ? fare : 0.0;
 
             if (isPassenger) {
                 // I'm the passenger, so show driver info
@@ -456,27 +465,43 @@ public class MyRidesActivity extends AppCompatActivity {
                 otherPersonPhone = driverPhone != null ? driverPhone : "";
                 otherPersonId = driverId != null ? driverId : "";
 
-                // For carpools, also show other passengers
-                if (TYPE_CARPOOL.equals(type) && passengerNames != null && passengerIds != null) {
-                    StringBuilder passengersBuilder = new StringBuilder();
-                    for (int i = 0; i < passengerNames.size(); i++) {
-                        if (i < passengerIds.size()) {
-                            String pName = passengerNames.get(i);
-                            String pId = passengerIds.get(i);
-                            if (currentUserId != null && !pId.equals(currentUserId)) {
-                                if (passengersBuilder.length() > 0) {
-                                    passengersBuilder.append(", ");
-                                }
-                                passengersBuilder.append(pName);
-                            }
+                // For passenger view in carpool, show THEIR specific pickup/drop
+                if (TYPE_CARPOOL.equals(type) && currentUserId != null) {
+                    // Find this passenger's specific stops
+                    if (passengerIds != null && passengerPickups != null && passengerDrops != null && passengerFares != null) {
+                        int myIndex = passengerIds.indexOf(currentUserId);
+                        if (myIndex >= 0 && myIndex < passengerPickups.size()) {
+                            Map<String, Object> myPickup = passengerPickups.get(myIndex);
+                            Map<String, Object> myDrop = passengerDrops.get(myIndex);
+
+                            displayPickup = myPickup != null ? (String) myPickup.get("address") : pickupLocation;
+                            displayDrop = myDrop != null ? (String) myDrop.get("address") : dropLocation;
+                            displayFare = myIndex < passengerFares.size() ? passengerFares.get(myIndex) : (farePerPassenger != null ? farePerPassenger : 0.0);
                         }
                     }
-                    allPassengerNames = passengersBuilder.toString();
+
+                    // Show other passengers
+                    if (passengerNames != null && passengerIds != null) {
+                        StringBuilder passengersBuilder = new StringBuilder();
+                        for (int i = 0; i < passengerNames.size(); i++) {
+                            if (i < passengerIds.size()) {
+                                String pName = passengerNames.get(i);
+                                String pId = passengerIds.get(i);
+                                if (!pId.equals(currentUserId)) {
+                                    if (passengersBuilder.length() > 0) {
+                                        passengersBuilder.append(", ");
+                                    }
+                                    passengersBuilder.append(pName);
+                                }
+                            }
+                        }
+                        allPassengerNames = passengersBuilder.toString();
+                    }
                 }
             } else {
-                // I'm the driver, so show passenger info
+                // I'm the driver
                 if (TYPE_CARPOOL.equals(type) && passengerNames != null && !passengerNames.isEmpty()) {
-                    // For carpools, show all passengers
+                    // For driver view in carpool, show all passengers
                     StringBuilder passengersBuilder = new StringBuilder();
                     for (String name : passengerNames) {
                         if (passengersBuilder.length() > 0) {
@@ -485,8 +510,13 @@ public class MyRidesActivity extends AppCompatActivity {
                         passengersBuilder.append(name);
                     }
                     otherPersonName = passengersBuilder.toString();
-                    otherPersonPhone = passengerNames.get(0); // Show first passenger's name
+                    otherPersonPhone = passengerNames.get(0);
                     otherPersonId = passengerIds != null && !passengerIds.isEmpty() ? passengerIds.get(0) : "";
+
+                    // Keep full route for driver
+                    displayPickup = pickupLocation;
+                    displayDrop = dropLocation;
+                    displayFare = fare != null ? fare : 0.0;
                 } else {
                     // Regular ride
                     otherPersonName = passengerName != null ? passengerName : "Passenger";
@@ -498,9 +528,9 @@ public class MyRidesActivity extends AppCompatActivity {
             MyRideItem rideItem = new MyRideItem(
                     id,
                     status != null ? status : "unknown",
-                    pickupLocation != null ? pickupLocation : "",
-                    dropLocation != null ? dropLocation : "",
-                    fare != null ? fare : 0.0,
+                    displayPickup != null ? displayPickup : "",
+                    displayDrop != null ? displayDrop : "",
+                    displayFare,
                     vehicleType != null ? vehicleType : "car",
                     passengers != null ? passengers.intValue() : 1,
                     departureTime,
@@ -514,19 +544,50 @@ public class MyRidesActivity extends AppCompatActivity {
                     maxSeats != null ? maxSeats.intValue() : 1,
                     passengerCount != null ? passengerCount.intValue() : 0,
                     allPassengerNames,
-                    0 // Will be updated by countUnreadMessages
+                    0
             );
 
-            // Count unread messages asynchronously
-            countUnreadMessages(id, rideItem);
+            // NEW: For driver view in carpool, add individual passenger details
+            if (!isPassenger && TYPE_CARPOOL.equals(type) && passengerNames != null && passengerPickups != null && passengerDrops != null) {
+                List<MyRideItem.PassengerDetail> details = new ArrayList<>();
 
+                for (int i = 0; i < passengerNames.size(); i++) {
+                    String pName = passengerNames.get(i);
+                    String pPhone = (passengerPhones != null && i < passengerPhones.size()) ? passengerPhones.get(i) : "";
+
+                    String pPickup = pickupLocation; // Default to full route
+                    String pDrop = dropLocation;
+                    double pFare = farePerPassenger != null ? farePerPassenger : 0.0;
+
+                    // Get passenger-specific locations
+                    if (i < passengerPickups.size() && passengerPickups.get(i) != null) {
+                        Map<String, Object> pickup = passengerPickups.get(i);
+                        pPickup = (String) pickup.get("address");
+                    }
+
+                    if (i < passengerDrops.size() && passengerDrops.get(i) != null) {
+                        Map<String, Object> drop = passengerDrops.get(i);
+                        pDrop = (String) drop.get("address");
+                    }
+
+                    if (passengerFares != null && i < passengerFares.size()) {
+                        pFare = passengerFares.get(i);
+                    }
+
+                    details.add(new MyRideItem.PassengerDetail(pName, pPhone, pPickup, pDrop, pFare));
+                }
+
+                rideItem.setPassengerDetails(details);
+            }
+
+            countUnreadMessages(id, rideItem);
             return rideItem;
+
         } catch (Exception e) {
             Log.e(TAG, "Error parsing ride item", e);
             return null;
         }
     }
-
     private void countUnreadMessages(String rideId, MyRideItem rideItem) {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser == null) return;
@@ -554,27 +615,29 @@ public class MyRidesActivity extends AppCompatActivity {
                         for (int i = 0; i < ridesList.size(); i++) {
                             if (ridesList.get(i).getId().equals(rideId)) {
                                 // Create updated ride item with unread count
+                                MyRideItem oldRide = ridesList.get(i);
                                 MyRideItem updatedRide = new MyRideItem(
-                                        rideItem.getId(),
-                                        rideItem.getStatus(),
-                                        rideItem.getPickupLocation(),
-                                        rideItem.getDropLocation(),
-                                        rideItem.getFare(),
-                                        rideItem.getVehicleType(),
-                                        rideItem.getPassengers(),
-                                        rideItem.getDepartureTime(),
-                                        rideItem.getAcceptedAt(),
-                                        rideItem.getOtherPersonName(),
-                                        rideItem.getOtherPersonPhone(),
-                                        rideItem.getOtherPersonId(),
-                                        rideItem.isPassengerView(),
-                                        rideItem.isCarpool(),
-                                        rideItem.getFarePerPassenger(),
-                                        rideItem.getMaxSeats(),
-                                        rideItem.getPassengerCount(),
-                                        rideItem.getAllPassengerNames(),
+                                        oldRide.getId(),
+                                        oldRide.getStatus(),
+                                        oldRide.getPickupLocation(),
+                                        oldRide.getDropLocation(),
+                                        oldRide.getFare(),
+                                        oldRide.getVehicleType(),
+                                        oldRide.getPassengers(),
+                                        oldRide.getDepartureTime(),
+                                        oldRide.getAcceptedAt(),
+                                        oldRide.getOtherPersonName(),
+                                        oldRide.getOtherPersonPhone(),
+                                        oldRide.getOtherPersonId(),
+                                        oldRide.isPassengerView(),
+                                        oldRide.isCarpool(),
+                                        oldRide.getFarePerPassenger(),
+                                        oldRide.getMaxSeats(),
+                                        oldRide.getPassengerCount(),
+                                        oldRide.getAllPassengerNames(),
                                         unreadCount
                                 );
+                                updatedRide.setPassengerDetails(oldRide.getPassengerDetails());
                                 ridesList.set(i, updatedRide);
                                 adapter.notifyItemChanged(i);
                                 break;
@@ -583,6 +646,73 @@ public class MyRidesActivity extends AppCompatActivity {
                     }
                 })
                 .addOnFailureListener(e -> Log.e(TAG, "Error counting unread messages", e));
+    }
+
+    // Update showRideDetails method to show passenger-specific info for driver
+    private void showRideDetails(MyRideItem ride) {
+        String roleLabel = ride.isPassengerView() ? "Driver" : "Passenger";
+        boolean isCarpool = ride.isCarpool();
+
+        StringBuilder details = new StringBuilder();
+        details.append("Type: ").append(isCarpool ? "CARPOOL" : "REGULAR RIDE").append("\n");
+        details.append("Status: ").append(ride.getStatus().toUpperCase()).append("\n\n");
+
+        if (!ride.isPassengerView() && isCarpool && ride.getPassengerDetails() != null && !ride.getPassengerDetails().isEmpty()) {
+            // DRIVER VIEW - Show each passenger's details
+            details.append("=== FULL ROUTE ===\n");
+            details.append("Start: ").append(ride.getPickupLocation()).append("\n");
+            details.append("End: ").append(ride.getDropLocation()).append("\n");
+            details.append("Total Fare: ৳").append(String.format(Locale.getDefault(), "%.0f", ride.getFare())).append("\n");
+            details.append("Passengers: ").append(ride.getPassengerCount()).append("/").append(ride.getMaxSeats()).append("\n\n");
+
+            details.append("=== PASSENGER DETAILS ===\n");
+            List<MyRideItem.PassengerDetail> passengers = ride.getPassengerDetails();
+            for (int i = 0; i < passengers.size(); i++) {
+                MyRideItem.PassengerDetail p = passengers.get(i);
+                details.append("\nPassenger ").append(i + 1).append(":\n");
+                details.append("Name: ").append(p.getName()).append("\n");
+                if (p.getPhone() != null && !p.getPhone().isEmpty()) {
+                    details.append("Phone: ").append(p.getPhone()).append("\n");
+                }
+                details.append("Pickup: ").append(p.getPickupLocation()).append("\n");
+                details.append("Drop: ").append(p.getDropLocation()).append("\n");
+                details.append("Fare: ৳").append(String.format(Locale.getDefault(), "%.0f", p.getFare())).append("\n");
+            }
+
+            details.append("\nVehicle: ").append(ride.getVehicleType() != null ? ride.getVehicleType().toUpperCase() : "CAR");
+        } else {
+            // PASSENGER VIEW or REGULAR RIDE
+            details.append("From: ").append(ride.getPickupLocation()).append("\n");
+            details.append("To: ").append(ride.getDropLocation()).append("\n");
+            details.append("Fare: ৳").append(String.format(Locale.getDefault(), "%.0f", ride.getFare())).append("\n");
+
+            if (isCarpool && ride.getFarePerPassenger() > 0) {
+                details.append("Per passenger: ৳").append(String.format(Locale.getDefault(), "%.0f", ride.getFarePerPassenger())).append("\n");
+                details.append("Passengers: ").append(ride.getPassengerCount()).append("/").append(ride.getMaxSeats()).append("\n");
+            }
+
+            details.append("Vehicle: ").append(ride.getVehicleType() != null ? ride.getVehicleType().toUpperCase() : "CAR").append("\n");
+            details.append("Seats: ").append(ride.getPassengers()).append("\n\n");
+
+            if (isCarpool && ride.isPassengerView() && ride.getAllPassengerNames() != null && !ride.getAllPassengerNames().isEmpty()) {
+                details.append("--- Other Passengers ---\n");
+                details.append(ride.getAllPassengerNames()).append("\n\n");
+            }
+
+            details.append("--- ").append(roleLabel).append(" Info ---\n");
+            details.append("Name: ").append(ride.getOtherPersonName());
+
+            if (ride.getOtherPersonPhone() != null && !ride.getOtherPersonPhone().isEmpty() && !ride.getOtherPersonPhone().equals(ride.getOtherPersonName())) {
+                details.append("\nPhone: ").append(ride.getOtherPersonPhone());
+            }
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Ride Details")
+                .setMessage(details.toString())
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Call " + roleLabel, (dialog, which) -> callContact(ride))
+                .show();
     }
 
     private void openChat(MyRideItem ride) {
@@ -615,46 +745,7 @@ public class MyRidesActivity extends AppCompatActivity {
         }
     }
 
-    private void showRideDetails(MyRideItem ride) {
-        String roleLabel = ride.isPassengerView() ? "Driver" : "Passenger";
-        boolean isCarpool = ride.isCarpool();
 
-        String details = "Type: " + (isCarpool ? "CARPOOL" : "REGULAR RIDE") + "\n" +
-                "Status: " + ride.getStatus().toUpperCase() + "\n\n" +
-                "From: " + ride.getPickupLocation() + "\n" +
-                "To: " + ride.getDropLocation() + "\n" +
-                "Fare: ৳" + String.format(Locale.getDefault(), "%.0f", ride.getFare()) + "\n";
-
-        if (isCarpool && ride.getFarePerPassenger() > 0) {
-            details += "Per passenger: ৳" + String.format(Locale.getDefault(), "%.0f", ride.getFarePerPassenger()) + "\n";
-            details += "Passengers: " + ride.getPassengerCount() + "/" + ride.getMaxSeats() + "\n";
-        }
-
-        details += "Vehicle: " + (ride.getVehicleType() != null ?
-                ride.getVehicleType().toUpperCase() : "CAR") + "\n" +
-                "Seats: " + ride.getPassengers() + "\n\n";
-
-        if (isCarpool && ride.isPassengerView() && ride.getAllPassengerNames() != null &&
-                !ride.getAllPassengerNames().isEmpty()) {
-            details += "--- Other Passengers ---\n" +
-                    ride.getAllPassengerNames() + "\n\n";
-        }
-
-        details += "--- " + roleLabel + " Info ---\n" +
-                "Name: " + ride.getOtherPersonName();
-
-        if (ride.getOtherPersonPhone() != null && !ride.getOtherPersonPhone().isEmpty() &&
-                !ride.getOtherPersonPhone().equals(ride.getOtherPersonName())) {
-            details += "\nPhone: " + ride.getOtherPersonPhone();
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle("Ride Details")
-                .setMessage(details)
-                .setPositiveButton("OK", null)
-                .setNeutralButton("Call " + roleLabel, (dialog, which) -> callContact(ride))
-                .show();
-    }
 
     private void completeRide(MyRideItem ride) {
         FirebaseUser currentUser = mAuth.getCurrentUser();
@@ -671,15 +762,35 @@ public class MyRidesActivity extends AppCompatActivity {
             return;
         }
 
+        // For carpools, check if at least one passenger has joined
+        if (ride.isCarpool() && ride.getPassengerCount() == 0) {
+            Toast.makeText(this, "Cannot complete ride. No passengers have joined yet.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Build confirmation message
+        String confirmMessage;
+        if (ride.isCarpool()) {
+            int seatsLeft = ride.getMaxSeats() - ride.getPassengerCount();
+            if (seatsLeft > 0) {
+                confirmMessage = "This carpool has " + ride.getPassengerCount() + " passenger(s) and " +
+                        seatsLeft + " empty seat(s).\n\n" +
+                        "Are you sure you want to complete the ride now?";
+            } else {
+                confirmMessage = "All seats are filled! Mark this carpool as completed?";
+            }
+        } else {
+            confirmMessage = "Are you sure you want to mark this ride as completed? " +
+                    "This action will count the ride towards your total.";
+        }
+
         new AlertDialog.Builder(this)
                 .setTitle("Complete Ride?")
-                .setMessage("Are you sure you want to mark this ride as completed? This action will count the ride towards your total.")
+                .setMessage(confirmMessage)
                 .setPositiveButton("Yes, Complete", (dialog, which) -> {
                     if (ride.isCarpool()) {
-                        // For carpools, increment ride count for all passengers
                         completeCarpoolRide(ride, currentUserId);
                     } else {
-                        // For regular rides
                         String passengerId = ride.getOtherPersonId();
                         db.collection("ride_requests")
                                 .document(ride.getId())
@@ -695,6 +806,41 @@ public class MyRidesActivity extends AppCompatActivity {
                     }
                 })
                 .setNegativeButton("Cancel", null)
+                .show();
+    }
+    private void showStartRideEarlyOption(MyRideItem ride) {
+        if (!ride.isCarpool() || ride.getPassengerCount() == 0) {
+            return;
+        }
+
+        int seatsLeft = ride.getMaxSeats() - ride.getPassengerCount();
+
+        new AlertDialog.Builder(this)
+                .setTitle("Start Ride Early?")
+                .setMessage("You have " + ride.getPassengerCount() + " passenger(s) and " +
+                        seatsLeft + " empty seat(s).\n\n" +
+                        "Do you want to:\n" +
+                        "• Start the ride now with current passengers\n" +
+                        "• Wait for more passengers to join")
+                .setPositiveButton("Start Now", (dialog, which) -> {
+                    // Mark as accepted and start ride
+                    db.collection("ride_requests")
+                            .document(ride.getId())
+                            .update(
+                                    FIELD_STATUS, STATUS_ACCEPTED,
+                                    "startedEarly", true,
+                                    "startedAt", System.currentTimeMillis()
+                            )
+                            .addOnSuccessListener(aVoid -> {
+                                Toast.makeText(this, "✅ Ride started! No more passengers can join.",
+                                        Toast.LENGTH_LONG).show();
+                            })
+                            .addOnFailureListener(e -> {
+                                Toast.makeText(this, "Failed to start ride: " + e.getMessage(),
+                                        Toast.LENGTH_SHORT).show();
+                            });
+                })
+                .setNegativeButton("Wait", null)
                 .show();
     }
 

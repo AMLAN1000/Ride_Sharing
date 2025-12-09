@@ -4,12 +4,14 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import java.util.List;
+import java.util.Map;
 
 public class CarpoolAdapter extends RecyclerView.Adapter<CarpoolAdapter.CarpoolViewHolder> {
 
@@ -53,6 +55,52 @@ public class CarpoolAdapter extends RecyclerView.Adapter<CarpoolAdapter.CarpoolV
         holder.sourceText.setText(carpool.getSource());
         holder.destinationText.setText(carpool.getDestination());
         holder.departureTime.setText(carpool.getDepartureTime());
+
+        // Distance information
+        if (holder.tvDistance != null) {
+            holder.tvDistance.setText(String.format("%.1f km", carpool.getDistance()));
+        }
+
+        // Show route stops if available
+        LinearLayout layoutRouteStops = holder.itemView.findViewById(R.id.layout_route_stops);
+        TextView tvRouteStops = holder.itemView.findViewById(R.id.tv_route_stops);
+
+        if (layoutRouteStops != null && tvRouteStops != null) {
+            // Fetch route stops from Firestore
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("ride_requests")
+                    .document(carpool.getId())
+                    .get()
+                    .addOnSuccessListener(document -> {
+                        if (document.exists()) {
+                            List<Map<String, Object>> routeStops =
+                                    (List<Map<String, Object>>) document.get("routeStops");
+
+                            if (routeStops != null && routeStops.size() > 2) {
+                                // Build stops text
+                                StringBuilder stopsText = new StringBuilder();
+                                for (int i = 0; i < routeStops.size(); i++) {
+                                    Map<String, Object> stop = routeStops.get(i);
+                                    String address = (String) stop.get("address");
+
+                                    if (i == 0) {
+                                        stopsText.append("🟢 Start: ").append(address);
+                                    } else if (i == routeStops.size() - 1) {
+                                        stopsText.append("\n🔴 End: ").append(address);
+                                    } else {
+                                        stopsText.append("\n🟡 Stop ").append(i).append(": ").append(address);
+                                    }
+                                }
+
+                                tvRouteStops.setText(stopsText.toString());
+                                layoutRouteStops.setVisibility(View.VISIBLE);
+                            } else {
+                                layoutRouteStops.setVisibility(View.GONE);
+                            }
+                        }
+                    })
+                    .addOnFailureListener(e -> layoutRouteStops.setVisibility(View.GONE));
+        }
 
         // Seats information
         int seatsLeft = carpool.getMaxSeats() - carpool.getPassengerCount();

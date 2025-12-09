@@ -1,6 +1,11 @@
 package com.example.ridesharing;
 
+import android.app.AlertDialog;
 import android.content.Intent;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
+import com.google.android.gms.maps.model.LatLng;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
@@ -23,8 +28,10 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class AvailableCarpoolsActivity extends AppCompatActivity implements CarpoolAdapter.OnCarpoolClickListener {
 
@@ -464,10 +471,9 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
         if (currentUserId.equals(carpool.getDriverId())) {
             new androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("Cannot Join Own Carpool")
-                    .setMessage("You cannot join your own carpool. This feature is for passengers to find rides.")
+                    .setMessage("You cannot join your own carpool.")
                     .setPositiveButton("OK", null)
                     .show();
-            Log.w(TAG, "Attempted self-join by driver: " + currentUserId);
             return;
         }
 
@@ -481,18 +487,215 @@ public class AvailableCarpoolsActivity extends AppCompatActivity implements Carp
             return;
         }
 
+        // Check if this carpool has multiple stops
+        db.collection("ride_requests").document(carpool.getId())
+                .get()
+                .addOnSuccessListener(document -> {
+                    if (document.exists()) {
+                        List<Map<String, Object>> routeStops =
+                                (List<Map<String, Object>>) document.get("routeStops");
+
+                        if (routeStops != null && routeStops.size() > 2) {
+                            // Multiple stops - show stop selection dialog
+                            showStopSelectionDialog(carpool, routeStops);
+                        } else {
+                            // Simple carpool - join directly
+                            showSimpleJoinDialog(carpool);
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Error loading carpool details", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void showStopSelectionDialog(Carpool carpool, List<Map<String, Object>> routeStops) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_select_stops, null);
+        builder.setView(dialogView);
+
+        Spinner spinnerPickup = dialogView.findViewById(R.id.spinner_pickup_stop);
+        Spinner spinnerDrop = dialogView.findViewById(R.id.spinner_drop_stop);
+        TextView tvDistance = dialogView.findViewById(R.id.tv_selected_distance);
+        TextView tvFare = dialogView.findViewById(R.id.tv_selected_fare);
+        Button btnConfirm = dialogView.findViewById(R.id.btn_confirm_stops);
+
+        // Create stop addresses list
+        List<String> stopAddresses = new ArrayList<>();
+        List<LatLng> stopLatLngs = new ArrayList<>();
+
+        for (Map<String, Object> stop : routeStops) {
+            String address = (String) stop.get("address");
+            Double lat = (Double) stop.get("lat");
+            Double lng = (Double) stop.get("lng");
+
+            stopAddresses.add(address);
+            if (lat != null && lng != null) {
+                stopLatLngs.add(new LatLng(lat, lng));
+            }
+        }
+
+        // Setup spinners
+        ArrayAdapter<String> pickupAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, stopAddresses);
+        pickupAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerPickup.setAdapter(pickupAdapter);
+
+        ArrayAdapter<String> dropAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, stopAddresses);
+        dropAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerDrop.setAdapter(dropAdapter);
+
+        // Set default selection (start to end)
+        spinnerPickup.setSelection(0);
+        spinnerDrop.setSelection(stopAddresses.size() - 1);
+
+        AlertDialog dialog = builder.create();
+
+        // Calculate fare when selection changes
+        AdapterView.OnItemSelectedListener selectionListener = new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                int pickupIndex = spinnerPickup.getSelectedItemPosition();
+                int dropIndex = spinnerDrop.getSelectedItemPosition();
+
+                if (pickupIndex >= dropIndex) {
+                    tvDistance.setText("-- km");
+                    tvFare.setText("৳--");
+                    btnConfirm.setEnabled(false);
+                    Toast.makeText(AvailableCarpoolsActivity.this,
+                            "Drop-off must be after pickup", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                // Calculate distance for selected segment
+                double distance = 0;
+                for (int i = pickupIndex; i < dropIndex && i < stopLatLngs.size() - 1; i++) {
+                    distance += calculateHaversineDistance(stopLatLngs.get(i), stopLatLngs.get(i + 1));
+                }
+
+                // Calculate fare proportionally
+                double totalDistance = carpool.getDistance();
+                double totalFare = carpool.getTotalFare();
+                double segmentFare = (distance / totalDistance) * totalFare;
+
+                // Round to nearest 5
+                segmentFare = Math.round(segmentFare / 5) * 5;
+
+                tvDistance.setText(String.format(Locale.getDefault(), "%.1f km", distance));
+                tvFare.setText(String.format(Locale.getDefault(), "৳%.0f", segmentFare));
+                btnConfirm.setEnabled(true);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        };
+
+        spinnerPickup.setOnItemSelectedListener(selectionListener);
+        spinnerDrop.setOnItemSelectedListener(selectionListener);
+
+        // Initial calculation
+        selectionListener.onItemSelected(null, null, 0, 0);
+
+        btnConfirm.setOnClickListener(v -> {
+            int pickupIndex = spinnerPickup.getSelectedItemPosition();
+            int dropIndex = spinnerDrop.getSelectedItemPosition();
+            String pickupLocation = stopAddresses.get(pickupIndex);
+            String dropLocation = stopAddresses.get(dropIndex);
+            String fareText = tvFare.getText().toString().replace("৳", "").trim();
+            double fare = Double.parseDouble(fareText);
+
+            dialog.dismiss();
+            joinCarpoolWithStops(carpool, pickupLocation, dropLocation, fare, pickupIndex, dropIndex);
+        });
+
+        dialog.show();
+    }
+
+    private void showSimpleJoinDialog(Carpool carpool) {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Join Carpool")
                 .setMessage("Join carpool with " + carpool.getDriverName() +
                         "\n\nFare per passenger: ৳" + String.format(Locale.getDefault(), "%.0f", carpool.getFarePerPassenger()) +
-                        "\nTotal fare: ৳" + String.format(Locale.getDefault(), "%.0f", carpool.getTotalFare()) +
-                        "\nVehicle: " + carpool.getVehicleModel() +
-                        "\nAvailable Seats: " + carpool.getAvailableSeats() +
-                        "\nAlready joined: " + carpool.getPassengerCount() + "/" + carpool.getMaxSeats())
+                        "\nFrom: " + carpool.getSource() +
+                        "\nTo: " + carpool.getDestination())
                 .setPositiveButton("Join", (dialog, which) -> joinCarpool(carpool))
                 .setNegativeButton("Cancel", null)
                 .show();
     }
+
+    private void joinCarpoolWithStops(Carpool carpool, String pickupLocation, String dropLocation,
+                                      double fare, int pickupIndex, int dropIndex) {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) return;
+
+        String passengerId = currentUser.getUid();
+        Toast.makeText(this, "Joining carpool...", Toast.LENGTH_SHORT).show();
+
+        db.collection("users").document(passengerId)
+                .get()
+                .addOnSuccessListener(userDocument -> {
+                    String passengerName = "Passenger";
+                    if (userDocument.exists()) {
+                        passengerName = userDocument.getString("fullName");
+                        if (passengerName == null || passengerName.trim().isEmpty()) {
+                            passengerName = currentUser.getDisplayName();
+                            if (passengerName == null || passengerName.trim().isEmpty()) {
+                                passengerName = "Passenger";
+                            }
+                        }
+                    }
+
+                    final String finalPassengerName = passengerName;
+
+                    // Create passenger join data
+                    Map<String, Object> passengerData = new HashMap<>();
+                    passengerData.put("passengerId", passengerId);
+                    passengerData.put("passengerName", passengerName);
+                    passengerData.put("pickupLocation", pickupLocation);
+                    passengerData.put("dropLocation", dropLocation);
+                    passengerData.put("fare", fare);
+                    passengerData.put("pickupStopIndex", pickupIndex);
+                    passengerData.put("dropStopIndex", dropIndex);
+                    passengerData.put("joinedAt", System.currentTimeMillis());
+
+                    db.collection("ride_requests").document(carpool.getId())
+                            .update(
+                                    "passengerIds", com.google.firebase.firestore.FieldValue.arrayUnion(passengerId),
+                                    "passengerNames", com.google.firebase.firestore.FieldValue.arrayUnion(passengerName),
+                                    "passengerCount", com.google.firebase.firestore.FieldValue.increment(1),
+                                    "lastUpdatedBy", passengerId
+                            )
+                            .addOnSuccessListener(aVoid -> {
+                                // Store passenger-specific details in subcollection
+                                db.collection("ride_requests").document(carpool.getId())
+                                        .collection("passengers")
+                                        .document(passengerId)
+                                        .set(passengerData)
+                                        .addOnSuccessListener(aVoid2 -> {
+                                            Toast.makeText(this, "✅ Joined carpool successfully!", Toast.LENGTH_LONG).show();
+                                            checkAndUpdateCarpoolStatus(carpool, passengerId);
+                                        });
+                            })
+                            .addOnFailureListener(e -> {
+                                Toast.makeText(this, "Failed to join: " + e.getMessage(),
+                                        Toast.LENGTH_SHORT).show();
+                                Log.e(TAG, "Error joining carpool", e);
+                            });
+                });
+    }
+    private double calculateHaversineDistance(LatLng point1, LatLng point2) {
+        double earthRadius = 6371;
+        double dLat = Math.toRadians(point2.latitude - point1.latitude);
+        double dLon = Math.toRadians(point2.longitude - point1.longitude);
+        double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(Math.toRadians(point1.latitude)) * Math.cos(Math.toRadians(point2.latitude)) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return Math.max(earthRadius * c, 1.0);
+    }
+
 
     @Override
     public void onCarpoolProfileViewClick(Carpool carpool) {
