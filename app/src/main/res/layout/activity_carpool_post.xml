@@ -579,7 +579,7 @@
                     android:layout_marginBottom="12dp"
                     android:backgroundTint="#9E9E9E"
                     android:enabled="false"
-                    android:text="Check Fare Fairness"
+                    android:text="Validate Price"
                     android:textColor="#FFFFFF"
                     android:textSize="16sp"
                     android:textStyle="bold"
