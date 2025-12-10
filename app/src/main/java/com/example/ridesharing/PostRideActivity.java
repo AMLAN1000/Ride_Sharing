@@ -1108,7 +1108,7 @@ public class PostRideActivity extends AppCompatActivity implements OnMapReadyCal
     }
 
     private void resetCheckFareButton() {
-        btnCheckFare.setText("Check Fare Fairness");
+        btnCheckFare.setText("Validate Price");
         btnCheckFare.setEnabled(true);
     }
 

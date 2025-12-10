@@ -38,6 +38,14 @@
           }
         },
         {
+          "client_id": "482721895597-vee5ksqkuhu1lo0fr75i834dmq82ru7q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ridesharing",
+            "certificate_hash": "0aac9d17f8edf08a2f7bbb6c5d12da9be2525e67"
+          }
+        },
+        {
           "client_id": "482721895597-igo9hnlbbuutdglmgl0is2aba7oti3e1.apps.googleusercontent.com",
           "client_type": 3
         }

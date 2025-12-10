@@ -1148,7 +1148,7 @@ public class PostRequestActivity extends AppCompatActivity implements OnMapReady
     }
 
     private void resetCheckFareButton() {
-        btnCheckFare.setText("Check Fare Fairness");
+        btnCheckFare.setText("Validate Price");
         btnCheckFare.setEnabled(true);
     }
 
