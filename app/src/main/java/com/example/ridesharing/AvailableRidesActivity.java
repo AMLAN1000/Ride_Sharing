@@ -280,7 +280,7 @@ public class AvailableRidesActivity extends AppCompatActivity implements RideAda
     private void setupRecyclerView() {
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         ridesRecyclerView.setLayoutManager(layoutManager);
-        ridesRecyclerView.setHasFixedSize(true);
+        //ridesRecyclerView.setHasFixedSize(true);
         rideAdapter = new RideAdapter(filteredList, this);
         ridesRecyclerView.setAdapter(rideAdapter);
     }
